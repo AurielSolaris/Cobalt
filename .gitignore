@@ -1,0 +1,28 @@
+# Internal references — not shipped
+.ref/
+
+# Internal planning doc — not shipped
+PLAN.md
+
+# Local machine configuration
+local.properties
+
+# Build output
+build/
+*/build/
+**/build/
+.gradle/
+.kotlin/
+captures/
+*.apk
+*.aab
+
+# Signing material — never commit
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store

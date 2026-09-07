@@ -1,0 +1,78 @@
+# Cobalt
+
+A revival of [Kiwi Browser](https://github.com/kiwibrowser) for Android.
+
+Kiwi is a Chromium fork whose defining feature — desktop-class extension support on
+mobile — has gone unmaintained. Cobalt picks the project up, carries its patches
+forward onto a current Chromium, and ships it under its own identity.
+
+It is three things at once, and the distinction between them is the whole design:
+
+| | What | Why |
+|---|---|---|
+| **Fork** | The engine tree — Blink, V8, the network stack, the extension system | Inherited whole from Chromium via Kiwi. Untouched except where a patch demands it. |
+| **Port** | Kiwi's patch set, carried onto a current Chromium; the build, identity, and signing moved to ours | Kiwi is years behind upstream. Closing that gap, repeatably, is the actual work. |
+| **Rewrite** | The Android shell above the engine — UI, address bar, tabs, settings | Written fresh in Kotlin and Compose rather than inherited from Kiwi's Java. This is the part we own. |
+
+**App ID:** `app.auriel.cobalt` · **Repository:** <https://github.com/AurielSolaris/Cobalt>
+
+---
+
+## Where the line is
+
+The engine is forked, never rewritten. Blink renders the pages, V8 runs the
+JavaScript, and Chromium's network stack fetches the bytes — we do not reimplement any
+of it, and patches that try will be declined regardless of quality.
+
+Everything above the engine is fair game to rewrite, and the shell largely is one.
+
+The JavaScript engine is **not** being replaced. A JavaScriptCore backend is parked as
+a post-1.0 experiment behind a build flag that is off by default; see Stage 12 of the
+project plan. The engine interface in `:modules:core` is kept engine-neutral so that
+experiment stays possible, and for no other reason.
+
+## Status
+
+Pre-alpha. Milestone 0.1.0 is a chassis: an installable app with an address bar that
+fetches a URL and renders a structural subset of the HTML through Compose. That
+renderer is a temporary bring-up shim with a scheduled deletion date — it is replaced
+by Blink once the Chromium tree builds.
+
+## Modules
+
+| Module | Contents |
+|---|---|
+| `:modules:core` | URL handling, HTTP fetching, text decoding, the JS engine interface |
+| `:modules:engine` | HTML tokenizer and tree builder, the stub JS engine |
+| `:modules:app` | Android Compose shell — address bar, content area, renderer |
+
+## Building
+
+```sh
+./gradlew :modules:app:assembleDebug
+./gradlew check
+```
+
+Requires JDK 17 and the Android SDK (compileSdk 35). Point `local.properties` at your
+SDK with `sdk.dir=...`. Full instructions, including the Chromium build environment
+needed from Stage 3 onward, are in [`docs/build.md`](docs/build.md).
+
+## Branches
+
+`nightly` is the integration line and everything lands there first; `stable` is the
+release line and only ever receives merges from `nightly`. See
+[`docs/branching.md`](docs/branching.md).
+
+## Licensing
+
+Cobalt is free software under the **GNU General Public License, version 3**
+([`LICENSE`](LICENSE)).
+
+That licence applies on top of, and does not replace, the licences of the upstream
+projects Cobalt is built from. Chromium, Blink, and V8 remain BSD-3-Clause; Kiwi
+Browser keeps its own terms. Those notices are reproduced in full in
+[`NOTICE`](NOTICE), and redistributing Cobalt means honouring all of them together.
+
+## Contact
+
+Debaditya Malakar — <debadityamalakar@gmail.com>
