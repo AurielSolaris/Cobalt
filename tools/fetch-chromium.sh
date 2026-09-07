@@ -67,14 +67,21 @@ fi
 #
 # --reset is also omitted: it would discard the shallow clone's state.
 #
-# -j: dependency fetches are network-bound, so more than cores is fine.
+# -j 4, not 12.
+#
+# chromium.googlesource.com rate-limits: twelve parallel fetches earned HTTP 429
+# on libaddressinput and libaom, and gclient quarantined the half-fetched trees
+# into _bad_scm/. The limit is on requests, not bandwidth, so fewer concurrent
+# clones is both kinder and faster in wall-clock terms than retrying failures.
+#
+# gclient sync is resumable: re-running picks up whatever is missing.
 echo "=== syncing DEPS"
 gclient sync \
     --no-history \
     --nohooks \
     --shallow \
     --delete_unversioned_trees \
-    -j 12
+    -j 4
 
 echo
 echo "=== sync finished $(date -u +%Y-%m-%dT%H:%M:%SZ)"
