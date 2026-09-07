@@ -16,6 +16,20 @@ It is three things at once, and the distinction between them is the whole design
 
 **App ID:** `app.auriel.cobalt` · **Repository:** <https://github.com/AurielSolaris/Cobalt>
 
+### Extensions: both MV2 and MV3
+
+Cobalt supports **Manifest V2 alongside Manifest V3, and will not drop MV2**.
+
+MV2 is the only manifest version that grants `webRequestBlocking` — a blocking,
+full-context view of network requests. MV3 replaces it with `declarativeNetRequest`,
+a static rule list, which is strictly less capable. Content blockers and anything
+that needs to reason about a request before it leaves the device work properly only
+under MV2.
+
+Extension support on mobile was Kiwi's reason for existing. Shipping it with the
+more capable half removed would be a downgrade wearing a revival's clothes.
+See [decision 0005](docs/decisions/0005-support-mv2-and-mv3.md).
+
 ---
 
 ## Where the line is
