@@ -101,8 +101,18 @@ case "${1:-all}" in
     echo "    started $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     # autoninja picks its own -j; it respects the load and the pools above.
     autoninja -C "$OUT" chrome_public_apk
-    echo "=== finished $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    ls -la "$OUT/apks/" 2>/dev/null || true
+    # Verify an APK actually exists rather than trusting the exit code.
+    #
+    # autoninja returned 0 on a build that failed in siso's scheduling phase,
+    # and an unconditional "finished" line then made a monitor report success.
+    # The artifact is the only honest signal.
+    if [ -f "$OUT/apks/ChromePublic.apk" ]; then
+        echo "=== finished $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        ls -la "$OUT/apks/"
+    else
+        echo "=== BUILD FAILED - no APK at $OUT/apks/ChromePublic.apk" >&2
+        exit 1
+    fi
     ;;
 
   all)
