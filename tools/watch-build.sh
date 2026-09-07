@@ -10,7 +10,12 @@ while true; do
   avail=$(awk '/MemAvailable/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 9999)
   swapfree=$(awk '/SwapFree/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 9999)
   n=$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)
-  clang=$(pgrep -fc clang 2>/dev/null || echo 0)
+  # pgrep -fc prints "0" AND exits non-zero when nothing matches, so an
+  # "|| echo 0" fallback appends a second zero and the value becomes "0
+0",
+  # which every numeric test then rejects. Same trap as "grep -c ... || echo 0"
+  # corrupting the patch-classification columns earlier in this project.
+  clang=$(pgrep -fc clang 2>/dev/null); clang=${clang:-0}
 
   if [ -f "$APK" ]; then
     echo "BUILD COMPLETE: ChromePublic.apk $(du -h "$APK" | cut -f1), $n objects"
