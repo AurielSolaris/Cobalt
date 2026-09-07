@@ -58,8 +58,15 @@ blink_symbol_level = 0
 v8_symbol_level = 0
 concurrent_links = 2
 
-# Nothing here uses NaCl, and it is a large chunk of build time.
-enable_nacl = false
+# NOTE: enable_nacl is deliberately absent.
+#
+# It was an ordinary argument on Kiwi's M105, but NaCl has since been removed
+# from Chromium entirely - on M140 there is no components/nacl and no
+# enable_nacl declaration anywhere in the tree, so setting it fails gn gen with
+# an unknown-argument error. Verified by tools/check-gn-args.sh.
+#
+# This is the small, boring shape of the four-year gap: an argument that was
+# correct on the old base is fatal on the new one.
 
 # No remote execution available; be explicit rather than let it probe.
 use_remoteexec = false
