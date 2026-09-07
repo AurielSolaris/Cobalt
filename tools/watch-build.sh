@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Emit only events worth acting on. Silence must not be able to mean "dying" --
+# the 16-job build thrashed at 4 objects/min for hours and looked merely slow.
+OUT=/build/chromium/m140/src/out/Default
+APK=$OUT/apks/ChromePublic.apk
+INTERVAL="${INTERVAL:-300}"
+prev=-1
+warned_mem=0
+while true; do
+  avail=$(awk '/MemAvailable/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 9999)
+  swapfree=$(awk '/SwapFree/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 9999)
+  n=$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)
+  clang=$(pgrep -fc clang 2>/dev/null || echo 0)
+
+  if [ -f "$APK" ]; then
+    echo "BUILD COMPLETE: ChromePublic.apk $(du -h "$APK" | cut -f1), $n objects"
+    exit 0
+  fi
+
+  # Memory warnings repeat only if the situation is still bad after recovering,
+  # so a sustained squeeze does not spam one message every five minutes.
+  if [ "$avail" -lt 400 ] || [ "$swapfree" -lt 1000 ]; then
+    if [ "$warned_mem" -eq 0 ]; then
+      echo "MEMORY PRESSURE: ${avail}MB available, ${swapfree}MB swap free, ${clang} clangs, ${n} objects"
+      warned_mem=1
+    fi
+  else
+    warned_mem=0
+  fi
+
+  if [ "$clang" -eq 0 ] && [ "$n" -eq "$prev" ] && [ "$n" -gt 0 ]; then
+    echo "BUILD STOPPED: no compilers, ${n} objects, no APK — died or finished badly"
+    exit 1
+  fi
+
+  if dmesg 2>/dev/null | tail -60 | grep -qiE 'Out of memory|oom-kill|Killed process'; then
+    echo "OOM KILL in dmesg at ${n} objects"
+  fi
+
+  prev=$n
+  sleep "$INTERVAL"
+done
