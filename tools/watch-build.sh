@@ -21,6 +21,15 @@ while true; do
   clang=$(pgrep -fc clang 2>/dev/null)
   clang=${clang:-0}
 
+  # The volume remounts read-only when the USB SSD throws write errors -- twice
+  # now -- and every compile then fails with "Read-only file system", which
+  # reads as 107 compiler errors rather than as one hardware fault.
+  if ! touch /build/.rwprobe 2>/dev/null; then
+    echo "VOLUME READ-ONLY: /build is not writable -- disk I/O failure, not a build error"
+    exit 1
+  fi
+  rm -f /build/.rwprobe
+
   if [ -f "$APK" ]; then
     echo "BUILD COMPLETE: ChromePublic.apk $(du -h "$APK" | cut -f1), $n objects"
     exit 0
