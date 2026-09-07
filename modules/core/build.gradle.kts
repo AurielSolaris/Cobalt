@@ -9,6 +9,8 @@ kotlin {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
+    // Not shipped. These targets exist to keep commonMain honest: shared code
+    // that reaches for a JVM API stops compiling here rather than in Stage 6.
     mingwX64()
     linuxX64()
 
@@ -17,6 +19,10 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        androidMain.dependencies {
+            implementation(libs.okhttp)
+            implementation(libs.kotlinx.coroutines.android)
         }
     }
 }

@@ -1,19 +1,20 @@
 package app.auriel.cobalt.core.js
 
 /**
- * The JavaScript engine abstraction — the seam that lets Cobalt swap V8 out
- * for JavaScriptCore without touching the rest of the browser.
+ * The JavaScript engine abstraction.
  *
- * Every concrete backend (V8, JSC, ...) implements this single interface.
- * Rendering, networking, and layout code depend only on [JsEngine], never on
- * a specific engine's types.
+ * V8 is the engine Cobalt ships. This interface exists so the rest of the
+ * browser depends on a JS engine rather than on V8's types — which keeps the
+ * shell testable against a stub, and keeps the door open for the Stage 12
+ * JavaScriptCore experiment without committing to it.
+ *
+ * Nothing here may name a specific backend. A caller that needs to know which
+ * engine it has should read [name] and be suspicious of its own reasons.
  */
 interface JsEngine {
 
+    /** Identifies the backend, for diagnostics and about screens. */
     val name: String
-
-    /** True when this backend is JavaScriptCore. */
-    val isJsc: Boolean
 
     /** Create an isolated execution context. */
     fun createContext(): JsContext

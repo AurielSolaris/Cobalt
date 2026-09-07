@@ -33,10 +33,25 @@ experiment stays possible, and for no other reason.
 
 ## Status
 
-Pre-alpha. Milestone 0.1.0 is a chassis: an installable app with an address bar that
-fetches a URL and renders a structural subset of the HTML through Compose. That
-renderer is a temporary bring-up shim with a scheduled deletion date — it is replaced
-by Blink once the Chromium tree builds.
+Pre-alpha. **Milestone 0.1.0 works**: type an address, and the page is fetched, parsed,
+and rendered on device. Links navigate. Tabs and incognito tabs work.
+
+What is real today:
+
+- Address bar with URL normalization — a bare host always becomes `https`, never `http`
+- Fetching over http(s) with redirects, charset detection, and typed, readable errors
+- A tolerant HTML parser that never throws on malformed markup
+- A renderer covering headings, paragraphs, inline emphasis, links, lists, `<pre>`,
+  block quotes, rules, and image alt text
+- In-memory tabs, a tab switcher, and incognito tabs
+- One Dark interface, blue accent, near-square corners
+
+What is deliberately not there yet: CSS, JavaScript execution, images, history,
+bookmarks, downloads, and extensions. The renderer is a bring-up shim with a scheduled
+deletion date — Blink replaces it in Stage 6, once the Chromium tree builds.
+
+The roadmap is in [`docs/roadmap.md`](docs/roadmap.md); design and engine decisions,
+including the ones that were rejected, are in [`docs/decisions/`](docs/decisions).
 
 ## Modules
 
@@ -44,7 +59,7 @@ by Blink once the Chromium tree builds.
 |---|---|
 | `:modules:core` | URL handling, HTTP fetching, text decoding, the JS engine interface |
 | `:modules:engine` | HTML tokenizer and tree builder, the stub JS engine |
-| `:modules:app` | Android Compose shell — address bar, content area, renderer |
+| `:modules:app` | Android Compose shell — chrome, tabs, address bar, renderer |
 
 ## Building
 
@@ -56,6 +71,17 @@ by Blink once the Chromium tree builds.
 Requires JDK 17 and the Android SDK (compileSdk 35). Point `local.properties` at your
 SDK with `sdk.dir=...`. Full instructions, including the Chromium build environment
 needed from Stage 3 onward, are in [`docs/build.md`](docs/build.md).
+
+## Interface
+
+One Dark, blue accent, near-square corners. Three bundled variable fonts: Open Sans for
+the interface, EB Garamond for display text and document headings, JetBrains Mono for
+code. A bottom bar carries Home, Extensions, Tabs, and Downloads; bookmarks and settings
+sit in the address bar's overflow menu.
+
+There is no shortcut grid and no trending-searches feed on the new-tab page, and there
+will not be one. Both are advertising surfaces. When Cobalt has browsing history to draw
+on, that page can show your own most-visited sites — earned, not sold.
 
 ## Branches
 
