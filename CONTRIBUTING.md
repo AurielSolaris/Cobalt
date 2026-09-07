@@ -15,6 +15,12 @@ are standing in determines what a good patch looks like:
   Compose, written fresh. This is the part we own outright, and normal design
   judgement applies.
 
+A third constraint cuts across all three: **the target device is 4 GB of RAM and
+2 cores.** Optimising means configuration, defaults, and the shell we own — build
+flags, feature toggles, process limits, eviction policy. It does not mean patching
+engine internals for speed, because a configuration change survives a rebase and a
+hand-tuned renderer does not. "It is fast on my phone" is not evidence.
+
 Two standing rules follow from that:
 
 - **Do not add features to the 0.1.0 Compose renderer.** It is a bring-up shim with a

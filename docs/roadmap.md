@@ -26,12 +26,35 @@ experiment that may never run.
 | 11 | Stabilization | 1.0.0 | Ship it |
 | 12 | JavaScriptCore | post-1.0 | Flag-gated experiment; may be abandoned |
 
+## The target device
+
+**4 GB of RAM and 2 CPU cores.** Not a floor Cobalt tolerates — the machine it is
+built for. Chromium's defaults assume much more headroom, and at this size memory
+is the binding constraint rather than CPU. That shapes the tab model (eviction is
+designed in, not retrofitted), the process model, and the defaults for
+prerendering — which, like memory saving, is a setting the user controls rather
+than policy applied to them. See
+[`decisions/0004-performance-budget.md`](decisions/0004-performance-budget.md).
+
+Optimising here means configuration, defaults, and the shell we own. It never
+means patching engine internals: a configuration change survives a rebase, and a
+hand-tuned renderer does not.
+
 ## Two dates worth knowing
 
-**Stage 5 is the hard one.** Kiwi is years behind upstream, and that lag is the actual
-reason it needs reviving. Its patches become an ordered series in `patches/`, applied
-onto a current Chromium branch one at a time. This has to become a repeatable
-quarterly process, not a one-time effort.
+**Stage 5 is the hard one.** Kiwi sits on Chromium 105 (August 2022); current stable
+is 152. That four-year lag is the actual reason it needs reviving.
+
+It is done in two hops — M105 to M140, then M140 to current — rather than one leap.
+M140 is three years on from Kiwi's base to within days, and it leaves a
+12-milestone remainder instead of a 47-milestone one. A single jump would land
+every conflict at once with no checkpoint and no way to tell progress from thrash.
+
+Kiwi's source is a whole-file **overlay**, not a patch series: it says which files
+were touched, never what changed inside them. Recovering real diffs — by checking
+out Chromium 105 and comparing — is Stage 2's job, and everything after it depends
+on that. See [`decisions/0003-staged-chromium-rebase.md`](decisions/0003-staged-chromium-rebase.md)
+and [`kiwi-delta.md`](kiwi-delta.md).
 
 **Stage 6 deletes code on purpose.** The 0.1.0 Compose renderer, the standalone HTML
 parser, and probably the HTTP client all go when Blink lands. They exist to get pixels
