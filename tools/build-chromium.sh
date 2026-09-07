@@ -52,7 +52,7 @@ is_debug = false
 is_official_build = false
 dcheck_always_on = false
 
-# Memory guards for an 8 GB build host. See the comment in build-chromium.sh.
+# Memory guards for a 10 GB build host. See the comment in build-chromium.sh.
 symbol_level = 0
 blink_symbol_level = 0
 v8_symbol_level = 0

@@ -60,6 +60,21 @@ cat > /build/depot_tools/.disable_auto_update <<'EOF'
 Auto-update disabled so a long fetch cannot be changed underneath itself.
 EOF
 
+# Bootstrap depot_tools' vendored Python once, explicitly.
+#
+# DEPOT_TOOLS_UPDATE=0 keeps a multi-hour fetch from being changed underneath
+# itself, but it also suppresses the one-time bootstrap that writes
+# python3_bin_reldir.txt - without which `gn gen` fails with "need to
+# initialize depot_tools". Doing it here separates the two concerns.
+#
+# ensure_bootstrap may fail partway on luci-auth, which is a CIPD tool we do
+# not use; the file we need is written before that point.
+if [ ! -f /build/depot_tools/python3_bin_reldir.txt ]; then
+    echo "bootstrapping depot_tools"
+    (cd /build/depot_tools && ./ensure_bootstrap >/dev/null 2>&1) || true
+    [ -f /build/depot_tools/python3_bin_reldir.txt ]         && echo "  python3_bin_reldir.txt written"         || echo "  WARNING: bootstrap did not produce python3_bin_reldir.txt"
+fi
+
 echo
 echo "=== ready"
 echo "PATH needs: export PATH=/build/depot_tools:\$PATH"
