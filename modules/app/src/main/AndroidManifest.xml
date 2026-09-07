@@ -1,16 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:label="@string/app_name"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Cobalt"
+        android:usesCleartextTraffic="true">
+        <!--
+            usesCleartextTraffic is declared explicitly rather than left to the
+            platform default, because the default changes with targetSdk and a
+            browser's cleartext policy must not move underneath it.
+
+            A browser has to be able to load http:// when a user types it: there
+            are still hosts that serve nothing else, and refusing them outright
+            would be a browser that cannot browse. Cobalt never *upgrades into*
+            cleartext on its own - a typed bare host always becomes https (see
+            Url.normalize) - so reaching http requires the user to ask for it by
+            name. Stage 9 revisits this with a per-site policy and an interstitial.
+        -->
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Cobalt can be opened with a link, but is not registered as a
+                 default browser until Stage 7 gives it somewhere to put tabs. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
             </intent-filter>
         </activity>
     </application>

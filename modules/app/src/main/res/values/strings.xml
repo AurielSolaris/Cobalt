@@ -1,3 +1,12 @@
 <resources>
-    <string name="app_name">Cobalt</string>
+    <!-- app_name is supplied per build type in build.gradle.kts so the nightly
+         channel is distinguishable on the launcher. -->
+
+    <string name="address_bar_hint">Search or enter address</string>
+    <string name="address_bar_go">Go</string>
+    <string name="address_bar_clear">Clear</string>
+    <string name="action_reload">Reload</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_back">Back</string>
+    <string name="content_description_page">Page content</string>
 </resources>

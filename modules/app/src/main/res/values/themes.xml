@@ -1,0 +1,9 @@
+<resources>
+    <!-- Compose draws the interface; this theme only needs to supply a window
+         with no action bar and a background that matches the first frame. -->
+    <style name="Theme.Cobalt" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
