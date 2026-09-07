@@ -82,6 +82,25 @@ maintainer script at release time, and fetch the actual font files from
 `fonts.gstatic.com`, which needs no key. The picker works offline against the
 shipped list, and only downloading a chosen face touches the network.
 
+### What the catalogue holds, and the woff2 subset wrinkle
+
+`tools/fetch-google-fonts.py` writes `modules/app/src/main/assets/google-fonts.json`:
+1,895 proportional families and 51 monospace, about 207 KB. Per family: name,
+category, available weights, whether it has italics, popularity rank, and the
+scripts it covers.
+
+Popularity is there because **1,895 families in alphabetical order is a list
+nobody scrolls** — the picker leads with what people actually use and offers
+search beyond that. Subsets are there because of this, found by testing the
+runtime path rather than assuming it:
+
+The `css2` endpoint returns different things depending on the User-Agent. A
+generic one gets a single `.ttf` with every glyph. A **Chromium** UA gets
+**woff2 split by unicode-range** into per-script faces. woff2 is much smaller and
+Cobalt sends a Chromium UA anyway, so that is the path — but it means caching a
+font is caching *several* files and choosing which scripts to pull. Fetch latin
+plus whatever matches the user's locale, not all of them.
+
 ### The privacy tension, stated plainly
 
 Cobalt's Stage 9 goal is no silent telemetry and a justified reason for every

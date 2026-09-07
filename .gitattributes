@@ -22,5 +22,11 @@ gradlew.bat text eol=crlf
 patches/** -text
 *.patch -text
 
-# Shell scripts run in WSL/Linux.
+# Build scripts run in WSL/Linux.
 tools/*.sh text eol=lf
+tools/*.py text eol=lf
+
+# Generated catalogue: byte-compared by tools/fetch-google-fonts.py --check.
+# CRLF conversion on checkout would make a fresh clone report STALE against an
+# identical upstream, so keep it exactly as generated.
+modules/app/src/main/assets/google-fonts.json -text eol=lf
