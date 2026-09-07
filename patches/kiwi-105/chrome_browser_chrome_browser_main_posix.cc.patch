@@ -1,0 +1,11 @@
+--- a/chrome/browser/chrome_browser_main_posix.cc
++++ b/chrome/browser/chrome_browser_main_posix.cc
+@@ -175,6 +175,8 @@
+   // for now, crash.
+   NOTREACHED();
+ #else
++#if 0
+ #error "Need MessageBox implementation."
+ #endif
++#endif
+ }

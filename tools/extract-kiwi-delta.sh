@@ -31,6 +31,19 @@ OUT="${3:-./kiwi-delta-out}"
 [ -d "$OVERLAY" ]  || { echo "overlay not found: $OVERLAY" >&2; exit 1; }
 [ -d "$UPSTREAM" ] || { echo "upstream not found: $UPSTREAM" >&2; exit 1; }
 
+# Guard: a CRLF overlay against an LF upstream makes every file "differ" and
+# the whole result is noise. This cost a full run once; it is checked now.
+crlf=0
+while IFS= read -r f; do
+    head -c 8000 "$f" 2>/dev/null | grep -qU $'' && crlf=$((crlf + 1))
+done < <(find "$OVERLAY" -name '*.cc' -o -name '*.h' 2>/dev/null | head -20)
+if [ "$crlf" -gt 5 ]; then
+    echo "REFUSING: the overlay has CRLF line endings ($crlf of 20 sampled)." >&2
+    echo "Upstream Chromium is LF, so every file would falsely read as modified." >&2
+    echo "Re-clone the overlay on Linux, or with -c core.autocrlf=false." >&2
+    exit 1
+fi
+
 mkdir -p "$OUT/patches"
 : > "$OUT/identical.txt"
 : > "$OUT/modified.txt"

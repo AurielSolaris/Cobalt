@@ -1,0 +1,11 @@
+--- a/chrome/browser/ui/managed_ui.cc
++++ b/chrome/browser/ui/managed_ui.cc
+@@ -76,7 +76,7 @@
+   return enterprise_util::IsBrowserManaged(profile);
+ }
+ 
+-#if !BUILDFLAG(IS_ANDROID)
++#if !BUILDFLAG(IS_ANDROID) || true
+ std::u16string GetManagedUiMenuItemLabel(Profile* profile) {
+   absl::optional<std::string> account_manager =
+       GetAccountManagerIdentity(profile);

@@ -1,0 +1,12 @@
+--- a/third_party/blink/renderer/platform/graphics/dark_mode_filter.h
++++ b/third_party/blink/renderer/platform/graphics/dark_mode_filter.h
+@@ -34,9 +34,6 @@
+   enum class ElementRole { kForeground, kListSymbol, kBackground, kSVG };
+   enum class ImageType { kNone, kIcon, kSeparator, kPhoto };
+ 
+-  static ElementRole BorderElementRole(SkColor border_color,
+-                                       SkColor background_color);
+-
+   SkColor InvertColorIfNeeded(SkColor color, ElementRole element_role);
+ 
+   absl::optional<cc::PaintFlags> ApplyToFlagsIfNeeded(

@@ -1,0 +1,19 @@
+--- a/chrome/browser/extensions/global_shortcut_listener.cc
++++ b/chrome/browser/extensions/global_shortcut_listener.cc
+@@ -26,7 +26,7 @@
+ bool GlobalShortcutListener::RegisterAccelerator(
+     const ui::Accelerator& accelerator, Observer* observer) {
+   CHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+-  if (IsShortcutHandlingSuspended())
++  if (true || IsShortcutHandlingSuspended())
+     return false;
+ 
+   AcceleratorMap::const_iterator it = accelerator_map_.find(accelerator);
+@@ -83,6 +83,7 @@
+ }
+ 
+ void GlobalShortcutListener::SetShortcutHandlingSuspended(bool suspended) {
++  if (true) return;
+   CHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+   if (shortcut_handling_suspended_ == suspended)
+     return;

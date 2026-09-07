@@ -1,0 +1,14 @@
+--- a/chrome/browser/ui/browser_list_observer.h
++++ b/chrome/browser/ui/browser_list_observer.h
+@@ -7,9 +7,11 @@
+ 
+ #include "build/build_config.h"
+ 
++#if 0
+ #if BUILDFLAG(IS_ANDROID)
+ #error This file should only be included on desktop.
+ #endif
++#endif
+ 
+ class Browser;
+ 

@@ -1,0 +1,14 @@
+--- a/chrome/browser/tab_group/java/src/org/chromium/chrome/browser/tasks/tab_groups/TabGroupModelFilter.java
++++ b/chrome/browser/tab_group/java/src/org/chromium/chrome/browser/tasks/tab_groups/TabGroupModelFilter.java
+@@ -854,6 +854,11 @@
+     }
+ 
+     @Override
++    public int getLastNonExtensionActiveIndex() {
++        return mCurrentGroupIndex;
++    }
++
++    @Override
+     public int getCount() {
+         return mGroupIdToGroupMap.size();
+     }

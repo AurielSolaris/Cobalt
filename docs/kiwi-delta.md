@@ -133,37 +133,57 @@ name grep says nothing about the functional changes, which are the hard part.
 
 ---
 
-## Blocked on the base checkout
+## The real delta — measured
 
-Everything below needs Chromium **105.0.5195.24** sources to diff against. Until
-then the classification cannot be honest, because we cannot tell a modified file
-from a copied one.
+Chromium `105.0.5195.24` was checked out (391,558 files, 5.6 GB) and every overlay
+file compared against its upstream counterpart. Source only; **it was never built**,
+and it has served its purpose and can be deleted.
 
-The procedure, once the base exists:
+| | Files | Share |
+|---|---:|---:|
+| Total in the overlay | 8,297 | |
+| **Identical to upstream** | **7,746** | **93%** |
+| Modified | 277 | 3% |
+| Kiwi-only | 184 | 2% |
+| Binary differs | 90 | 1% |
 
-1. Check out Chromium at exactly `105.0.5195.24`.
-2. For each of the 8,313 overlay files, diff against its upstream counterpart.
-3. **Discard every file that is byte-identical.** Expectation: most of them.
-   Recording the real number is a Stage 2 deliverable in itself.
-4. Files with no upstream counterpart are Kiwi's own additions — keep whole.
-5. Generate a real patch series into `patches/`, one logical change per patch,
-   each with a header saying what it does and why.
-6. Classify each patch **keep** / **drop** / **rebase**, in the table below.
+**93% of the overlay was upstream code Kiwi merely copied.** The real delta is 551
+files — 6.6% of what the tree appeared to hold — and the modified portion comes to
+**1.1 MB, 11,220 diff lines, 4,136 added and 755 removed**.
 
-### Classification (to be filled in)
+That is the most encouraging number the project has produced. Carrying ~4,100 added
+lines across 35 milestones is ordinary work, not an epic.
+
+The series is committed at [`../patches/`](../patches), which documents the areas
+touched, the largest patches, and how to reproduce the extraction.
+
+**Exactly one patch touches V8**, which independently supports
+[`decisions/0001-keep-v8.md`](decisions/0001-keep-v8.md): Kiwi barely goes near the
+JavaScript engine, so replacing it would buy nothing Kiwi ever wanted.
+
+### A trap worth recording
+
+The first extraction reported **0 identical out of 378** — every file changed. That
+was wrong. `.ref/kiwi` had been cloned on Windows, where git rewrote it to CRLF;
+upstream Chromium is LF, so every text file differed by invisible `\r` bytes alone.
+
+The overlay is now cloned inside Linux, and `tools/extract-kiwi-delta.sh` refuses to
+run if it samples an overlay with CRLF endings. A result of "100% modified" is a bug
+report, not a finding.
+
+### Classification — next
+
+The 277 patches are extracted but **not yet sorted**. Each needs a class:
+
+- **keep** — the extension system and the Android UI that makes extensions usable
+  on a phone. 39 modified files mention extensions. This is what Cobalt is for.
+- **drop** — branding, telemetry, update-check endpoints, the Edge migration
+  README, and anything upstream has since absorbed.
+- **rebase** — real changes needing a port forward across the gap.
 
 | Patch | Area | Class | Rationale |
 |---|---|---|---|
-| _pending the base checkout_ | | | |
-
-Expected classes:
-
-- **keep** — the extension system, the Android UI changes that make extensions
-  usable on a phone. This is what Cobalt is for.
-- **drop** — Kiwi branding, telemetry, update-check endpoints, the Edge migration
-  README, and anything upstream has since absorbed.
-- **rebase** — everything else: real changes that need porting forward across the
-  gap.
+| _to be filled in_ | | | |
 
 ---
 
@@ -173,4 +193,7 @@ Recorded for documentation only. Cobalt ships V8 and is not replacing it; this
 section exists so the Stage 12 experiment has a map if it ever runs, and for no
 other reason. See [`decisions/0001-keep-v8.md`](decisions/0001-keep-v8.md).
 
-_To be filled in during the diff pass._
+**Of Kiwi's 277 patches, exactly one references `v8::` at all.** Kiwi's changes sit
+in the browser UI, the extension system, and a little of Blink's loader and layout —
+not in the JS engine. Whatever Stage 12 would cost, none of it is inherited from
+Kiwi, and none of Kiwi's value depends on it.

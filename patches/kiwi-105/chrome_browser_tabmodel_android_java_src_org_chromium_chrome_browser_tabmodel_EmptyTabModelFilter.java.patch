@@ -1,0 +1,14 @@
+--- a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/EmptyTabModelFilter.java
++++ b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/EmptyTabModelFilter.java
+@@ -46,6 +46,11 @@
+     }
+ 
+     @Override
++    public int getLastNonExtensionActiveIndex() {
++        return getTabModel().getLastNonExtensionActiveIndex();
++    }
++
++    @Override
+     public int getCount() {
+         return getTabModel().getCount();
+     }

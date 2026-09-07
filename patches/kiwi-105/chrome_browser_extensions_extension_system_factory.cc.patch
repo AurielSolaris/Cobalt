@@ -1,0 +1,14 @@
+--- a/chrome/browser/extensions/extension_system_factory.cc
++++ b/chrome/browser/extensions/extension_system_factory.cc
+@@ -92,8 +92,11 @@
+ ExtensionSystemFactory::ExtensionSystemFactory()
+     : ExtensionSystemProvider("ExtensionSystem",
+                               BrowserContextDependencyManager::GetInstance()) {
++#if 0
+   DCHECK(ExtensionsBrowserClient::Get())
+       << "ExtensionSystemFactory must be initialized after BrowserProcess";
++#endif
++if (extensions::ExtensionsBrowserClient::Get())
+   DependsOn(ExtensionSystemSharedFactory::GetInstance());
+ }
+ 

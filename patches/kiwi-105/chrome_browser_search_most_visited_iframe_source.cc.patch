@@ -1,0 +1,13 @@
+--- a/chrome/browser/search/most_visited_iframe_source.cc
++++ b/chrome/browser/search/most_visited_iframe_source.cc
+@@ -90,7 +90,9 @@
+ 
+ bool MostVisitedIframeSource::ServesPath(const std::string& path) const {
+   return path == kTitleHTMLPath || path == kTitleCSSPath ||
+-         path == kTitleJSPath;
++         path == kTitleJSPath ||
++         path == "/local-ntp.html" || path == "/local-ntp.js" ||
++         path == "/local-ntp.css" || path == "/new-ntp.html";
+ }
+ 
+ void MostVisitedIframeSource::SendResource(

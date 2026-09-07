@@ -1,0 +1,15 @@
+    137 chrome/browser
+     45 chrome/android
+     22 third_party/blink
+      8 extensions/common
+      6 ui/webui
+      6 extensions/browser
+      6 content/public
+      6 chrome/renderer
+      3 components/ntp_tiles
+      3 components/embedder_support
+      3 base/android
+      2 components/history
+      1 services/metrics
+      1 remoting/android
+      1 README.md

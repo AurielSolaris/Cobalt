@@ -1,0 +1,12 @@
+--- a/chrome/browser/autocomplete/tab_matcher_desktop.h
++++ b/chrome/browser/autocomplete/tab_matcher_desktop.h
+@@ -21,7 +21,9 @@
+   bool IsTabOpenWithURL(const GURL& gurl,
+                         const AutocompleteInput* input) const override;
+ 
++#if 0
+   std::vector<content::WebContents*> GetOpenTabs() const override;
++#endif
+ 
+  private:
+   bool IsStrippedURLEqualToWebContentsURL(

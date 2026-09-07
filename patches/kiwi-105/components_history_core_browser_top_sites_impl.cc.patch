@@ -1,0 +1,27 @@
+--- a/components/history/core/browser/top_sites_impl.cc
++++ b/components/history/core/browser/top_sites_impl.cc
+@@ -434,6 +434,7 @@
+ }
+ 
+ bool TopSitesImpl::AddPrepopulatedPages(MostVisitedURLList* urls) const {
++  LOG(INFO) << "[Kiwi] TopSitesImpl::AddPrepopulatedPages: " << prepopulated_pages_.size();
+   bool added = false;
+   for (const auto& prepopulated_page : prepopulated_pages_) {
+     if (urls->size() >= kTopSitesNumber)
+@@ -443,6 +444,7 @@
+       added = true;
+     }
+   }
++  LOG(INFO) << "[Kiwi] TopSitesImpl::AddPrepopulatedPages, added: " << added;
+   return added;
+ }
+ 
+@@ -450,7 +452,7 @@
+     const MostVisitedURLList& urls) {
+   MostVisitedURLList result;
+   for (const auto& url : urls) {
+-    if (IsBlocked(url.url))
++    if (IsBlocked(url.url) || url.url.spec().find("chrome.google.com") != std::string::npos)
+       continue;
+     if (result.size() >= kTopSitesNumber)
+       break;

@@ -1,0 +1,22 @@
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
+@@ -183,6 +183,10 @@
+             setManagedPreferenceDelegateForPreference(PREF_PASSWORDS);
+         }
+ 
++        Preference safetyCheck = findPreference(PREF_SAFETY_CHECK);
++        if (safetyCheck != null)
++            getPreferenceScreen().removePreference(safetyCheck);
++
+         setManagedPreferenceDelegateForPreference(PREF_SEARCH_ENGINE);
+ 
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+@@ -397,6 +401,8 @@
+     }
+ 
+     private void onSyncPromoPreferenceStateChanged() {
++        if (true)
++            return;
+         if (ChromeFeatureList.isEnabled(ChromeFeatureList.SYNC_ANDROID_PROMOS_WITH_ILLUSTRATION)
+                 || ChromeFeatureList.isEnabled(
+                         ChromeFeatureList.SYNC_ANDROID_PROMOS_WITH_SINGLE_BUTTON)

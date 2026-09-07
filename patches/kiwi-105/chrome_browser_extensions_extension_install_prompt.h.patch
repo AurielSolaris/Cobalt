@@ -1,0 +1,19 @@
+--- a/chrome/browser/extensions/extension_install_prompt.h
++++ b/chrome/browser/extensions/extension_install_prompt.h
+@@ -150,6 +150,7 @@
+     void AppendRatingStars(StarAppender appender, void* data) const;
+     std::u16string GetRatingCount() const;
+     std::u16string GetUserCount() const;
++    std::u16string GetPermissionsAsString() const;
+     size_t GetPermissionCount() const;
+     std::u16string GetPermission(size_t index) const;
+     std::u16string GetPermissionsDetails(size_t index) const;
+@@ -390,6 +391,8 @@
+   // The object responsible for doing the UI specific actions.
+   std::unique_ptr<extensions::ExtensionInstallUI> install_ui_;
+ 
++  content::WebContents* contents_;
++
+   // Parameters to show the confirmation UI.
+   std::unique_ptr<ExtensionInstallPromptShowParams> show_params_;
+ 

@@ -1,0 +1,21 @@
+--- a/chrome/browser/download/chrome_download_manager_delegate.h
++++ b/chrome/browser/download/chrome_download_manager_delegate.h
+@@ -80,7 +80,8 @@
+                           int64_t total_bytes,
+                           DownloadLocationDialogType dialog_type,
+                           const base::FilePath& suggested_path,
+-                          DownloadDialogBridge::DialogCallback callback);
++                          DownloadDialogBridge::DialogCallback callback,
++                          download::DownloadItem* download);
+ 
+   void SetDownloadDialogBridgeForTesting(DownloadDialogBridge* bridge);
+ #endif
+@@ -348,6 +349,8 @@
+   IdCallbackVector id_callbacks_;
+   std::unique_ptr<DownloadPrefs> download_prefs_;
+ 
++  download::DownloadItem* last_download_item_;
++
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   // Maps from pending extension installations to DownloadItem IDs.
+   typedef base::flat_map<extensions::CrxInstaller*,
