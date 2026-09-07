@@ -8,6 +8,27 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Stage 3 — upstream build (in progress)
+- Build host: Ubuntu 24.04 in WSL2 with depot_tools, on a 500 GB ext4 volume.
+- Fetching Chromium **140.0.7339.264** — the final M140 patch, so it carries every
+  security fix on that line.
+
+### Stage 2 — classification (completes 0.2.0)
+- Classified all 277 patches — `docs/patch-classification.md`. **About a third of
+  the diff is dropped, and it is the third hardest to rebase.** Three patches
+  (1,208 added lines, 25% of the delta) implement ad blocking by hand inside
+  Blink: a 700-line chain of URL substring matches in the fetch path, and
+  element-hiding by literal DOM id during layout. Both are 2022-specific, have no
+  update mechanism, and sit in the Blink files most likely to be refactored
+  upstream. Extensions do this properly, which is the point of the project.
+- 44 patches / 1,248 lines are extension work and are kept whatever the cost.
+- Flagged 76 patches that disable upstream code with `#if 0`, `&& 0`, or `|| true`
+  rather than by configuration; each needs its intent recovered as a real flag.
+- Mapped Kiwi onto Cobalt's structure — `docs/module-map.md`. No Kiwi patch lands
+  in `modules/core` or `modules/engine`, and the 45 Android UI patches are read as
+  a specification for which Chromium surfaces to call rather than ported as code,
+  since Cobalt's shell is already written in Compose.
+
 ### Stage 2 — reference pinning (in progress)
 
 - Pinned the Kiwi reference to `7be7edd1532148f22103cb4c5a1964d96297836f`
