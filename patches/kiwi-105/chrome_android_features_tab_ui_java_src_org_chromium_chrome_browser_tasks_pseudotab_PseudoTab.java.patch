@@ -1,0 +1,11 @@
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/pseudotab/PseudoTab.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/pseudotab/PseudoTab.java
+@@ -92,7 +92,7 @@
+                 if (cached.getTab() == tab) {
+                     return cached;
+                 } else {
+-                    assert tab.getWebContents() == null || cached.getTab().getWebContents() == null
++                    assert cached.getTab().getWebContents() == null
+                             || cached.getTab().getWebContents().getTopLevelNativeWindow() == null;
+                     return new PseudoTab(tab);
+                 }

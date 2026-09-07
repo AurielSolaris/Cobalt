@@ -1,0 +1,18 @@
+--- a/chrome/browser/ui/extensions/extension_install_ui_default.cc
++++ b/chrome/browser/ui/extensions/extension_install_ui_default.cc
+@@ -166,6 +166,7 @@
+ 
+   // Extensions aren't enabled by default in incognito so we confirm
+   // the install in a normal window.
++#if 0
+   Profile* current_profile = profile_->GetOriginalProfile();
+   Browser* browser = FindOrCreateVisibleBrowser(current_profile);
+   if (extension->is_app()) {
+@@ -180,6 +181,7 @@
+   }
+ 
+   ShowPlatformBubble(extension, browser, *icon);
++#endif
+ }
+ 
+ void ExtensionInstallUIDefault::OnInstallFailure(

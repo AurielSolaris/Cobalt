@@ -1,0 +1,17 @@
+--- a/chrome/browser/signin/account_consistency_mode_manager.cc
++++ b/chrome/browser/signin/account_consistency_mode_manager.cc
+@@ -130,10 +130,13 @@
+   return GetMethodForProfile(profile) == AccountConsistencyMethod::kDice;
+ }
+ 
+-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
++#if BUILDFLAG(ENABLE_DICE_SUPPORT) || true
+ // static
+ bool AccountConsistencyModeManager::IsDiceSignInAllowed() {
++#if 0
+   return CanEnableDiceForBuild() && IsBrowserSigninAllowedByCommandLine();
++#endif
++  return false;
+ }
+ #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
+ 

@@ -15,3 +15,12 @@ gradlew.bat text eol=crlf
 *.png binary
 *.jks binary
 *.keystore binary
+
+# Patch files must keep their exact bytes. They apply to LF Chromium sources,
+# and a CRLF-converted patch fails to apply. This is the same trap that made the
+# first delta extraction report every file as modified - see patches/README.md.
+patches/** -text
+*.patch -text
+
+# Shell scripts run in WSL/Linux.
+tools/*.sh text eol=lf

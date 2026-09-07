@@ -4,14 +4,12 @@ import app.auriel.cobalt.core.js.JsValue
 import app.auriel.cobalt.core.js.JsValueType
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 
 class NoopEngineTest {
 
     @Test
     fun satisfiesEngineContract() {
         val engine = NoopEngine()
-        assertFalse(engine.isJsc)
         assertEquals("noop", engine.name)
 
         val context = engine.createContext()

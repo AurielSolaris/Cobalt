@@ -1,0 +1,11 @@
+--- a/chrome/browser/ui/managed_ui.h
++++ b/chrome/browser/ui/managed_ui.h
+@@ -27,7 +27,7 @@
+ // users.
+ bool ShouldDisplayManagedUi(Profile* profile);
+ 
+-#if !BUILDFLAG(IS_ANDROID)
++#if !BUILDFLAG(IS_ANDROID) || true
+ // The label for the App Menu item for Managed UI.
+ std::u16string GetManagedUiMenuItemLabel(Profile* profile);
+ 

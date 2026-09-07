@@ -1,0 +1,21 @@
+--- a/third_party/blink/renderer/platform/graphics/dark_mode_settings.h
++++ b/third_party/blink/renderer/platform/graphics/dark_mode_settings.h
+@@ -32,6 +32,8 @@
+ struct DarkModeSettings {
+   DarkModeInversionAlgorithm mode =
+       DarkModeInversionAlgorithm::kInvertLightnessLAB;
++  bool grayscale = false;
++  float image_grayscale_percent = 0.0;  // Valid range from 0.0 to 1.0
+   float contrast = 0.0;                 // Valid range from -1.0 to 1.0
+   DarkModeImagePolicy image_policy = DarkModeImagePolicy::kFilterNone;
+ 
+@@ -49,6 +51,9 @@
+ 
+   // True if text contrast should be increased by painting an outline.
+   bool increase_text_contrast = false;
++
++  // True if the user interface is dark / black
++  bool is_dark_ui = false;
+ };
+ 
+ }  // namespace blink

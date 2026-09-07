@@ -1,0 +1,14 @@
+--- a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelImpl.java
++++ b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelImpl.java
+@@ -191,6 +191,11 @@
+     }
+ 
+     @Override
++    public int getLastNonExtensionActiveIndex() {
++        return mDelegateModel.getLastNonExtensionActiveIndex();
++    }
++
++    @Override
+     public boolean isActiveModel() {
+         return mActive;
+     }

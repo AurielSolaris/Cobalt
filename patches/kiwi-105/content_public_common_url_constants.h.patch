@@ -1,0 +1,10 @@
+--- a/content/public/common/url_constants.h
++++ b/content/public/common/url_constants.h
+@@ -20,6 +20,7 @@
+ CONTENT_EXPORT extern const char kChromeDevToolsScheme[];
+ CONTENT_EXPORT extern const char kChromeErrorScheme[];
+ CONTENT_EXPORT extern const char kChromeUIScheme[];  // Used for WebUIs.
++CONTENT_EXPORT extern const char kChromeSearchScheme[];  // Used for WebUIs.
+ CONTENT_EXPORT extern const char kChromeUIUntrustedScheme[];
+ CONTENT_EXPORT extern const char kGuestScheme[];
+ CONTENT_EXPORT extern const char kViewSourceScheme[];
