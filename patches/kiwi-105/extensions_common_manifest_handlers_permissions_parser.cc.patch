@@ -1,0 +1,13 @@
+--- a/extensions/common/manifest_handlers/permissions_parser.cc
++++ b/extensions/common/manifest_handlers/permissions_parser.cc
+@@ -166,6 +166,10 @@
+         // the flag here.
+         valid_schemes &= ~URLPattern::SCHEME_CHROMEUI;
+       }
++      if (pattern.scheme() != "chrome-search" &&
++          !all_urls_includes_chrome_urls) {
++        valid_schemes &= ~URLPattern::SCHEME_CHROMESEARCH;
++      }
+       pattern.SetValidSchemes(valid_schemes);
+ 
+       if (!CanSpecifyHostPermission(extension, pattern, api_permissions)) {

@@ -1,0 +1,12 @@
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/adaptive/OptionalNewTabButtonController.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/adaptive/OptionalNewTabButtonController.java
+@@ -119,6 +119,9 @@
+ 
+             boolean isIncognito = tabModelSelector.isIncognitoSelected();
+             RecordUserAction.record("MobileTopToolbarOptionalButtonNewTab");
++            if (isIncognito)
++            tabCreatorManager.getTabCreator(isIncognito).launchIncognitoNTP();
++            else
+             tabCreatorManager.getTabCreator(isIncognito).launchNTP();
+ 
+             if (mTrackerSupplier.hasValue()) {

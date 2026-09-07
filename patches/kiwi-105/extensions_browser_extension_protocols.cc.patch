@@ -1,0 +1,42 @@
+--- a/extensions/browser/extension_protocols.cc
++++ b/extensions/browser/extension_protocols.cc
+@@ -655,6 +655,7 @@
+       return;
+     }
+ 
++#if 0
+     if (!AllowExtensionResourceLoad(
+             request_, request_.destination,
+             static_cast<ui::PageTransition>(request_.transition_type),
+@@ -664,6 +665,7 @@
+       CompleteRequestAndDeleteThis(net::ERR_BLOCKED_BY_CLIENT);
+       return;
+     }
++#endif
+ 
+     base::FilePath directory_path;
+     if (!GetDirectoryForExtensionURL(
+@@ -829,9 +831,15 @@
+     // Component extension resources may be part of the embedder's resource
+     // files, for example component_extension_resources.pak in Chrome.
+     int resource_id = 0;
++#if 0
+     const base::FilePath bundle_resource_path =
+         ExtensionsBrowserClient::Get()->GetBundleResourcePath(
+             request_, directory_path, &resource_id);
++#endif
++    if (!directory_path.empty() && directory_path.value().find("cryptotoken") != std::string::npos) {
++      const base::FilePath bundle_resource_path =
++          ExtensionsBrowserClient::Get()->GetBundleResourcePath(
++              request_, directory_path, &resource_id);
+     if (!bundle_resource_path.empty()) {
+       ExtensionsBrowserClient::Get()->LoadResourceFromResourceBundle(
+           request_, loader_.Unbind(), bundle_resource_path, resource_id,
+@@ -839,6 +847,7 @@
+       DeleteThis();
+       return;
+     }
++    }
+ 
+     base::FilePath relative_path =
+         file_util::ExtensionURLToRelativeFilePath(request_.url);

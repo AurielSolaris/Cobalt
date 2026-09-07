@@ -1,0 +1,13 @@
+--- a/third_party/blink/renderer/core/paint/multi_column_set_painter.cc
++++ b/third_party/blink/renderer/core/paint/multi_column_set_painter.cc
+@@ -67,7 +67,9 @@
+     gfx::Rect pixel_snapped_rule_rect = ToPixelSnappedRect(bound);
+     BoxBorderPainter::DrawBoxSide(
+         paint_info.context, pixel_snapped_rule_rect, box_side, rule_color,
+-        rule_style, BorderPaintAutoDarkMode(block_style, rule_color));
++        rule_style,
++        PaintAutoDarkMode(block_style,
++                          DarkModeFilter::ElementRole::kBackground));
+   }
+ }
+ 

@@ -1,0 +1,11 @@
+--- a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/TabList.java
++++ b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/TabList.java
+@@ -26,6 +26,8 @@
+      */
+     int index();
+ 
++    int getLastNonExtensionActiveIndex();
++
+     /**
+      * @return the number of open tabs in this model
+      */

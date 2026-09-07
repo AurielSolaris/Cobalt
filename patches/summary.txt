@@ -1,0 +1,14 @@
+# Kiwi overlay vs pristine Chromium
+
+overlay:  /build/kiwi-overlay
+upstream: /build/chromium/src-105
+date:     2026-09-07T11:16:19Z
+
+total files        8297
+identical          7746  (93%)
+modified            277  (3%)
+kiwi-only           184  (2%)
+binary differs       90  (1%)
+
+The real delta is modified + kiwi-only + binary.
+Everything in identical.txt is upstream code Kiwi merely copied.

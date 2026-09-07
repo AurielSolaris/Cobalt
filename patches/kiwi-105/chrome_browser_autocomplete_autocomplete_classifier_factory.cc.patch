@@ -1,0 +1,10 @@
+--- a/chrome/browser/autocomplete/autocomplete_classifier_factory.cc
++++ b/chrome/browser/autocomplete/autocomplete_classifier_factory.cc
+@@ -52,6 +52,7 @@
+         "AutocompleteClassifier",
+         BrowserContextDependencyManager::GetInstance()) {
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
++if (extensions::ExtensionsBrowserClient::Get())
+   DependsOn(
+       extensions::ExtensionsBrowserClient::Get()->GetExtensionSystemFactory());
+ #endif

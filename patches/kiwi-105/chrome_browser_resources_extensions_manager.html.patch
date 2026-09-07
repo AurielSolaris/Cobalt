@@ -1,0 +1,10 @@
+--- a/chrome/browser/resources/extensions/manager.html
++++ b/chrome/browser/resources/extensions/manager.html
+@@ -4,7 +4,6 @@
+     display: flex;
+     flex-direction: column;
+     height: 100%;
+-    --cr-toolbar-field-width: 680px;
+   }
+ 
+   extensions-sidebar {

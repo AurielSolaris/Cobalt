@@ -1,0 +1,19 @@
+--- a/components/javascript_dialogs/app_modal_dialog_manager.cc
++++ b/components/javascript_dialogs/app_modal_dialog_manager.cc
+@@ -162,6 +162,16 @@
+     return;
+   }
+ 
++  if (render_frame_host != NULL) {
++    const url::Origin unwrapped_alerting_frame_origin =
++        UnwrapOriginIfOpaque(render_frame_host->GetLastCommittedOrigin());
++
++    if (unwrapped_alerting_frame_origin.GetURL().SchemeIs("chrome-extension")) {
++      *did_suppress_message = true;
++      return;
++    }
++  }
++
+   std::u16string dialog_title =
+       GetTitle(web_contents, render_frame_host->GetLastCommittedOrigin());
+ 

@@ -1,0 +1,11 @@
+--- a/third_party/blink/renderer/platform/graphics/dark_mode_image_classifier.cc
++++ b/third_party/blink/renderer/platform/graphics/dark_mode_image_classifier.cc
+@@ -30,7 +30,7 @@
+   return (SkColorGetA(color) < 128);
+ }
+ 
+-const int kMaxSampledPixels = 1000;
++const int kMaxSampledPixels = 5000;
+ const int kMaxBlocks = 10;
+ const float kMinOpaquePixelPercentageForForeground = 0.2;
+ 
