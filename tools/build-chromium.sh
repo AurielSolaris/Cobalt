@@ -99,8 +99,16 @@ case "${1:-all}" in
   build)
     echo "=== building chrome_public_apk"
     echo "    started $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    # autoninja picks its own -j; it respects the load and the pools above.
-    autoninja -C "$OUT" chrome_public_apk
+    # autoninja sizes -j from CPU count and ignores the memory ceiling, which
+    # is wrong for this host: 16 cores but a 10 GB cap. Heavy Blink and V8
+    # translation units peak near 1 GB per clang, so 16 of them exhausted RAM
+    # and all 16 GB of swap four hours in. The build did not fail -- it thrashed
+    # at 4 objects/min with 60% I/O wait, which looks like slowness rather than
+    # a misconfiguration and is far harder to notice.
+    #
+    # Memory is the binding constraint here, not CPU. Six jobs running at full
+    # speed beat sixteen fighting over swap.
+    autoninja -C "$OUT" -j "${COBALT_JOBS:-6}" chrome_public_apk
     # Verify an APK actually exists rather than trusting the exit code.
     #
     # autoninja returned 0 on a build that failed in siso's scheduling phase,
@@ -119,7 +127,7 @@ case "${1:-all}" in
     gclient runhooks
     write_args
     gn gen "$OUT"
-    autoninja -C "$OUT" chrome_public_apk
+    autoninja -C "$OUT" -j "${COBALT_JOBS:-6}" chrome_public_apk
     ls -la "$OUT/apks/" 2>/dev/null || true
     ;;
 
