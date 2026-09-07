@@ -1,5 +1,11 @@
 # 0002 — Shell design: One Dark, boxy, four sections, no ad surfaces
 
+> **Superseded in part by [0007](0007-user-themes.md):** the shipped default
+> theme is now IBM Carbon iced with a One Dark cast, and users can author their
+> own themes on the device. One Dark remains a preset. Everything else here —
+> boxy corners, the four bottom sections, no ad surfaces — still stands.
+
+
 **Status:** accepted
 **Date:** 2026-09-07
 
