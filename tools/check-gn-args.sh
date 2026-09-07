@@ -19,7 +19,7 @@ for a in $ARGS; do
             --include='*.gni' --include='*.gn' \
             build/ build_overrides/ 2>/dev/null | head -1)
     # A real check: the arg must appear inside a declare_args() block somewhere.
-    decl=$(grep -rn --include='*.gni' --include='*.gn' -A 40 'declare_args()' \
+    decl=$(grep -rn --include='*.gni' --include='*.gn' -A 150 'declare_args()' \
             build/ v8/ third_party/blink/ 2>/dev/null \
             | grep -cE "[[:space:]]${a}[[:space:]]*=" || true)
     if [ "${decl:-0}" -gt 0 ]; then
