@@ -50,27 +50,39 @@ fi
 if [ ! -d src/.git ]; then
     echo "=== cloning src at $TAG"
     rm -rf src
-    git clone --depth 1 --branch "$TAG" --single-branch         https://chromium.googlesource.com/chromium/src.git src
+    git clone --depth 1 --branch "$TAG" --single-branch \
+        https://chromium.googlesource.com/chromium/src.git src
 else
-    echo "=== src already present at $(git -C src describe --tags 2>/dev/null || echo unknown)"
+    echo "=== src already present"
+    git -C src --no-pager log -1 --format='    %H %d' 2>/dev/null | head -2
 fi
 
-# Jobs: parallel dependency fetches. Chromium has hundreds of DEPS entries and
-# this is network-bound, so more than cores is fine.
+# No --revision below, deliberately.
+#
+# src is already checked out at the exact tag. Passing --revision src@TAG makes
+# gclient re-resolve it, and against a shallow single-branch clone that becomes
+# `git fetch origin` with no depth limit — Chromium's entire history, tens of GB
+# and hours, to arrive at the commit we already have. With managed:False gclient
+# leaves src alone and resolves only the DEPS it declares, which is the job.
+#
+# --reset is also omitted: it would discard the shallow clone's state.
+#
+# -j: dependency fetches are network-bound, so more than cores is fine.
+echo "=== syncing DEPS"
 gclient sync \
-    --revision "src@$TAG" \
     --no-history \
     --nohooks \
     --shallow \
-    --reset \
     --delete_unversioned_trees \
-    -j 12 \
-    --verbose
+    -j 12
 
 echo
 echo "=== sync finished $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 du -sh "$DIR"
 git -C "$DIR/src" --no-pager log -1 --format='%H %d' 2>/dev/null | head -2
-cat "$DIR/src/chrome/VERSION" 2>/dev/null | tr '\n' ' '; echo
+tr '\n' ' ' < "$DIR/src/chrome/VERSION" 2>/dev/null; echo
 echo
-echo "next: build/install-build-deps.sh --android, then gclient runhooks"
+echo "next: tools/build-chromium.sh deps   (as root)"
+echo "      tools/build-chromium.sh hooks"
+echo "      tools/build-chromium.sh gen"
+echo "      tools/build-chromium.sh build"
