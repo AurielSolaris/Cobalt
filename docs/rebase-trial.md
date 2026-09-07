@@ -68,11 +68,27 @@ Tedious, not dangerous.
 
 **Five WebUI files no longer exist in that form** — `manager.html`,
 `detail_view.html`, `item_list.html`, `toggle_row.html`, `toolbar.html`.
-Chromium migrated its WebUI off Polymer/HTML. Kiwi's edits to the extensions
-management page cannot be ported; they have to be **reimplemented** against the
-current WebUI. This is the largest single unknown in the trial, and it is
-squarely on the critical path, since the extensions page is how a user manages
-extensions at all.
+Chromium migrated its WebUI off Polymer/HTML to Lit and TypeScript.
+
+This was initially flagged as the trial's top risk. **That was an overestimate,
+made before measuring Kiwi's actual change**, and the measurement (via
+`tools/check-webui-migration.sh`) is reassuring on both counts:
+
+- **Every file has an obvious successor.** `manager.html` became `manager.html.ts`
+  plus `manager.ts` and `manager.css`, and the same for the other four. The
+  migration was a mechanical template split, not a redesign, so Kiwi's edits can
+  be located in the new structure rather than reverse-engineered.
+- **Kiwi's total change across all five files is 55 added lines** — 21 in
+  `toggle_row`, 7 in `toolbar`, 3 each in `detail_view` and `item_list`, and
+  none at all in `manager`.
+
+55 lines of HTML re-expressed as Lit templates is a day's work with a clear
+target, not an open-ended unknown. M140's extensions WebUI is 55 TypeScript
+files, 23 of them Lit components, with zero Polymer remaining — so the
+destination is consistent and current.
+
+**The revised top risk is the 35 extension C++ conflicts and the 5 relocated C++
+files**, which is ordinary porting rather than reimplementation.
 
 ## Everything else deleted upstream
 
@@ -114,10 +130,10 @@ behind it. The trial confirms the shape of the job rather than upsetting it.
 
 Two things it does add:
 
-1. **The extensions WebUI migration is the top risk**, ahead of the C++
-   conflicts. It should be investigated before Stage 5a starts in earnest,
-   because it is reimplementation rather than porting and the estimate is
-   currently unknown.
+1. **The extensions work is ordinary porting, not reimplementation.** The WebUI
+   migration looked like the top risk until it was measured at 55 added lines
+   against files with direct successors. The real cost sits in the 35 extension
+   C++ conflicts and 5 relocated files — tedious, well-understood work.
 2. **A regression baseline now exists.** Re-running `tools/try-patches.sh` after
    each hop gives a number to compare against, so progress on Stage 5 is
    measurable rather than felt.
