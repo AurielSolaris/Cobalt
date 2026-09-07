@@ -53,6 +53,17 @@ deletion date — Blink replaces it in Stage 6, once the Chromium tree builds.
 The roadmap is in [`docs/roadmap.md`](docs/roadmap.md); design and engine decisions,
 including the ones that were rejected, are in [`docs/decisions/`](docs/decisions).
 
+## Built for 4 GB and 2 cores
+
+That is the target device, not the floor. Chromium's defaults assume far more
+headroom than a budget Android phone has, and at this size memory is the binding
+constraint rather than CPU — so background tabs are evicted by design, and the
+process model is a tuning decision rather than an inherited default.
+
+Memory saving and prerendering are **settings**, not silent policy. Both trade
+something you can feel — a reload when you return to a tab, data and battery spent
+on a guess — so both say what they cost and let you choose.
+
 ## Modules
 
 | Module | Contents |
@@ -86,7 +97,12 @@ on, that page can show your own most-visited sites — earned, not sold.
 ## Branches
 
 `nightly` is the integration line and everything lands there first; `stable` is the
-release line and only ever receives merges from `nightly`. See
+release line and only ever receives merges from `nightly`.
+
+From 0.2.0 to 1.0.0 every milestone also keeps a `nightly-0.x.0` and a
+`stable-0.x.0`, and those are never deleted. The risk in this project is
+concentrated in a few very large steps, and when one of them goes wrong a tag is a
+point whereas a branch is somewhere a fix can actually land. See
 [`docs/branching.md`](docs/branching.md).
 
 ## Licensing

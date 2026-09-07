@@ -26,10 +26,44 @@ A change sits on `nightly` before it is promoted. The minimum is a working day f
 routine changes; for anything touching the Chromium tree — a rebase, an engine change,
 a build-system change — it is a week.
 
+## Per-version branches
+
+From 0.2.0 through 1.0.0, every milestone also keeps its own pair of branches:
+
+| Branch | Cut from | Purpose |
+|---|---|---|
+| `nightly-0.x.0` | `nightly`, when work on 0.x.0 begins | The integration line *for that milestone*, frozen once it ships |
+| `stable-0.x.0` | `stable`, when 0.x.0 is promoted | The released state of that milestone, kept forever |
+
+The reason is that this project's risk is concentrated in a handful of very large
+steps — the Chromium rebase above all — and a tag is not enough to work from when
+one of them goes wrong. A tag is a point; a branch is a place you can commit to. If
+Stage 5 turns out to have broken something that only surfaces two milestones later,
+`stable-0.4.0` is still there, still buildable, and can take a fix without
+disturbing the lines that moved on.
+
+Rules:
+
+- **Per-version branches are never deleted.** They are the project's memory.
+- `nightly-0.x.0` is cut when the milestone's work starts, and stops receiving
+  commits when the milestone is promoted to `stable`.
+- `stable-0.x.0` is cut at promotion and is frozen, except for backported fixes.
+- A fix backported to a per-version branch is **cherry-picked forward** to
+  `nightly` in the same session, exactly as with hotfixes on `stable`.
+- The unversioned `nightly` and `stable` remain the live lines. The versioned ones
+  are for looking backwards, not for daily work.
+
+After 1.0.0 this is reconsidered: once releases are routine and the rebase process
+is proven, tags plus release branches for supported versions are likely enough.
+
 ## Tags
 
 - Stable releases: `v<major>.<minor>.<patch>`, tagged on `stable`.
-- Nightly builds: `nightly-<YYYYMMDD>`, tagged on `nightly`.
+- Nightly builds: `nightly/<YYYYMMDD>`, tagged on `nightly`. The slash keeps build
+  tags from reading like the `nightly-0.x.0` branches above.
+
+Tags and per-version branches are complementary, not redundant: the tag records
+the exact commit that shipped, the branch is where a fix to it can land.
 
 ## Channels
 
