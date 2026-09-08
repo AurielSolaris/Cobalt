@@ -12,5 +12,5 @@ sleep 2
 echo "after:"
 printf '  clang %s   siso %s\n' "$(pgrep -fc clang 2>/dev/null || echo 0)" "$(pgrep -fc siso 2>/dev/null || echo 0)"
 echo
-echo "objects preserved: $(find /build/chromium/m140/src/out/Default/obj -name '*.o' 2>/dev/null | wc -l)"
+echo "objects preserved: $(find /opt/cobalt/chromium/m140/src/out/Default/obj -name '*.o' 2>/dev/null | wc -l)"
 free -h | head -3

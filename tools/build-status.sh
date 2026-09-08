@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-shot build status: elapsed, objects, rate, ETA band, health.
-OUT="${OUT:-/build/chromium/m140/src/out/Default}"
+OUT="${OUT:-/opt/cobalt/chromium/m140/src/out/Default}"
 START="${START:-2026-09-07T15:02:06Z}"
 
 now=$(date -u +%s)

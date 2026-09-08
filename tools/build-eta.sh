@@ -5,7 +5,7 @@
 # measures what is actually on disk: object files created over a sample window.
 set -uo pipefail
 
-OUT="${1:-/build/chromium/m140/src/out/Default}"
+OUT="${1:-/opt/cobalt/chromium/m140/src/out/Default}"
 WINDOW="${2:-90}"
 
 count_obj() { find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l; }

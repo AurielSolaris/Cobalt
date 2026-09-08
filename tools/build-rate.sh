@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sample the compile rate from objects actually on disk.
-OUT="${OUT:-/build/chromium/m140/src/out/Default}"
+OUT="${OUT:-/opt/cobalt/chromium/m140/src/out/Default}"
 W="${1:-120}"
 a=$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)
 sleep "$W"

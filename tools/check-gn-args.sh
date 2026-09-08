@@ -5,7 +5,7 @@
 # step — which pulls gigabytes. Checking first is cheap.
 set -uo pipefail
 
-SRC="${1:-/build/chromium/m140/src}"
+SRC="${1:-/opt/cobalt/chromium/m140/src}"
 cd "$SRC" || { echo "no checkout at $SRC" >&2; exit 1; }
 
 ARGS="concurrent_links symbol_level blink_symbol_level v8_symbol_level

@@ -7,7 +7,7 @@
 # than guessed at.
 set -uo pipefail
 
-SRC="${1:-/build/chromium/m140/src}"
+SRC="${1:-/opt/cobalt/chromium/m140/src}"
 PATCHES="${2:-patches/kiwi-105}"
 UI="$SRC/chrome/browser/resources/extensions"
 

@@ -17,7 +17,7 @@
 #     problem and are not one.
 set -euo pipefail
 
-SRC="${SRC:-/build/chromium/m140/src}"
+SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 OUT="${OUT:-out/Default}"
 JOBS="${COBALT_JOBS:-6}"
 CLEAN=0
@@ -35,8 +35,8 @@ printf '  VERSION '; tr '\n' ' ' < chrome/VERSION; echo
 
 echo
 echo "=== volume"
-if touch /build/.rwprobe 2>/dev/null; then rm -f /build/.rwprobe; echo "  writable"
-else echo "  /build IS READ-ONLY -- disk failure, not a build problem" >&2; exit 1; fi
+if touch "$SRC/.rwprobe" 2>/dev/null; then rm -f "$SRC/.rwprobe"; echo "  writable"
+else echo "  build tree IS READ-ONLY -- disk failure, not a build problem" >&2; exit 1; fi
 
 if [ "$CLEAN" = 1 ]; then
     echo

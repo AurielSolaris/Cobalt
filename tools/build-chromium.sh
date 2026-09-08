@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-SRC="${SRC:-/build/chromium/m140/src}"
+SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 OUT="${OUT:-out/Default}"
 
 export PATH="/build/depot_tools:$PATH"

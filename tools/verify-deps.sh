@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-SRC="${1:-/build/chromium/m140/src}"
+SRC="${1:-/opt/cobalt/chromium/m140/src}"
 cd "$SRC" || { echo "no checkout at $SRC" >&2; exit 1; }
 
 empty=0

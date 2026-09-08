@@ -19,7 +19,7 @@
 set -uo pipefail
 
 PATCHES="${1:-patches/kiwi-105}"
-SRC="${2:-/build/chromium/m140/src}"
+SRC="${2:-/opt/cobalt/chromium/m140/src}"
 OUT="${3:-/build/patch-trial}"
 
 [ -d "$SRC/.git" ] || { echo "no Chromium checkout at $SRC" >&2; exit 1; }

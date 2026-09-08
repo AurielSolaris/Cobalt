@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Emit only events worth acting on. Silence must not be able to mean "dying" --
 # the 16-job build thrashed at 4 objects/min for hours and looked merely slow.
-OUT=/build/chromium/m140/src/out/Default
+OUT=/opt/cobalt/chromium/m140/src/out/Default
 APK=$OUT/apks/ChromePublic.apk
 INTERVAL="${INTERVAL:-300}"
 prev=-1
@@ -24,11 +24,11 @@ while true; do
   # The volume remounts read-only when the USB SSD throws write errors -- twice
   # now -- and every compile then fails with "Read-only file system", which
   # reads as 107 compiler errors rather than as one hardware fault.
-  if ! touch /build/.rwprobe 2>/dev/null; then
-    echo "VOLUME READ-ONLY: /build is not writable -- disk I/O failure, not a build error"
+  if ! touch "$(dirname "$OUT")/.rwprobe" 2>/dev/null; then
+    echo "VOLUME READ-ONLY: build tree is not writable -- disk I/O failure, not a build error"
     exit 1
   fi
-  rm -f /build/.rwprobe
+  rm -f "$(dirname "$OUT")/.rwprobe"
 
   if [ -f "$APK" ]; then
     echo "BUILD COMPLETE: ChromePublic.apk $(du -h "$APK" | cut -f1), $n objects"

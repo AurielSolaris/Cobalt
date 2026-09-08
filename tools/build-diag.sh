@@ -2,7 +2,7 @@
 # Reproduce a build failure and capture the full error, unwrapped.
 set -uo pipefail
 
-SRC="${SRC:-/build/chromium/m140/src}"
+SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 OUT="${OUT:-out/Default}"
 TARGET="${1:-chrome_public_apk}"
 

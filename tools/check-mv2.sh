@@ -4,7 +4,7 @@
 # Kiwi is M105, where MV2 was the default and fully supported. Upstream has been
 # removing MV2 progressively since. Whatever is already gone here is code we must
 # carry ourselves, forever, and the burden grows with every rebase.
-SRC="${SRC:-/build/chromium/m140/src}"
+SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 cd "$SRC" || exit 1
 
 echo "=== tree: $(tr '\n' ' ' < chrome/VERSION)"

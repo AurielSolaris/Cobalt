@@ -11,7 +11,7 @@
 
 set -uo pipefail
 
-SRC="${SRC:-/build/chromium/m140/src}"
+SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 DEP="${1:?usage: $0 <path-relative-to-src>}"
 
 cd "$SRC" || exit 1

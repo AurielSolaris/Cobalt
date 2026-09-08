@@ -32,7 +32,7 @@ def block(flag):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--src", default=os.environ.get("SRC", "/build/chromium/m140/src"))
+    ap.add_argument("--src", default=os.environ.get("SRC", "/opt/cobalt/chromium/m140/src"))
     ap.add_argument("--check", action="store_true")
     a = ap.parse_args()
 
