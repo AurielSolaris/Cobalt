@@ -68,6 +68,17 @@ concurrent_links = 2
 # This is the small, boring shape of the four-year gap: an argument that was
 # correct on the old base is fatal on the new one.
 
+# Cache compiled objects between builds. This is the local stand-in for the
+# shared object cache Google gives Chromium engineers through RBE: without it,
+# every one of the ~160 patch batches in Stage 5 re-pays for files it never
+# touched, and switching branches throws away the whole build.
+#
+# The first build after enabling this gets no hits -- the cache is cold, and
+# the win starts from the second. Enabling it also requires a fresh gn gen,
+# which invalidates out/, so it goes in after the current build finishes
+# rather than during it.
+cc_wrapper = "ccache"
+
 # No remote execution available; be explicit rather than let it probe.
 use_remoteexec = false
 
