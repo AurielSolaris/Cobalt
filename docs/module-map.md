@@ -55,6 +55,18 @@ Two patches in that set are exceptions and get ported as-is: anything modifying
 C++ or JNI signatures that the Kotlin side depends on. The Java UI itself is not
 carried forward.
 
+### The shape Cobalt's UI takes
+
+Not Chromium's, and not Kiwi's. The controls live in a **bottom bar**, with
+Firefox Nightly as the loose reference: the address bar and primary actions sit
+within thumb reach rather than at the top of a tall phone.
+
+This matters to the port because it decides what the specification above is
+*for*. Reading Kiwi's menu patches tells us which Chromium seams the extension
+UI must bind to; it does not tell us where those controls sit. The seams are
+inherited, the layout is ours. So a Kiwi patch that moves a toolbar item is
+information about capability, never about placement.
+
 ## The boundary
 
 Everything crosses at one place, and Stage 6 builds it:
