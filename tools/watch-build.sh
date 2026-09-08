@@ -2,6 +2,7 @@
 # Emit only events worth acting on. Silence must not be able to mean "dying" --
 # the 16-job build thrashed at 4 objects/min for hours and looked merely slow.
 OUT=/opt/cobalt/chromium/m140/src/out/Default
+SRCROOT=/opt/cobalt/chromium/m140/src
 APK=$OUT/apks/ChromePublic.apk
 INTERVAL="${INTERVAL:-300}"
 prev=-1
@@ -24,11 +25,23 @@ while true; do
   # The volume remounts read-only when the USB SSD throws write errors -- twice
   # now -- and every compile then fails with "Read-only file system", which
   # reads as 107 compiler errors rather than as one hardware fault.
-  if ! touch "$(dirname "$OUT")/.rwprobe" 2>/dev/null; then
+  # Probe the checkout root, not out/. out/ does not exist between a clean
+  # start and gn gen, and touch then fails with ENOENT -- which this reported
+  # as a read-only volume, sending me to diagnose a disk fault that was not
+  # happening.
+  if ! touch "$SRCROOT/.rwprobe" 2>/dev/null; then
     echo "VOLUME READ-ONLY: build tree is not writable -- disk I/O failure, not a build error"
     exit 1
   fi
-  rm -f "$(dirname "$OUT")/.rwprobe"
+  rm -f "$SRCROOT/.rwprobe"
+
+  # The build now lives on the system disk. Filling C: breaks Windows, not
+  # just the build, so this warns with room to act rather than at zero.
+  freeg=$(df -BG --output=avail / 2>/dev/null | tail -1 | tr -dc 0-9)
+  freeg=${freeg:-999}
+  if [ "$freeg" -lt 25 ]; then
+    echo "DISK LOW: ${freeg}GB free on the build filesystem -- stop before it fills"
+  fi
 
   if [ -f "$APK" ]; then
     echo "BUILD COMPLETE: ChromePublic.apk $(du -h "$APK" | cut -f1), $n objects"
