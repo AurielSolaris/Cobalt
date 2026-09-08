@@ -1,0 +1,26 @@
+Make kChromeAppsEnabled exist on Android.
+
+Replaces Kiwi's version, which appended `|| true` to the platform condition:
+
+    -#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    -    BUILDFLAG(IS_FUCHSIA)
+    +    BUILDFLAG(IS_FUCHSIA) || true
+
+Same objection as 0001: it makes the guard unconditional rather than saying
+which platform it is for, so the condition no longer documents anything and any
+platform upstream adds silently inherits it.
+
+The pref itself is needed because Cobalt supports extensions on Android, and the
+code paths that read kChromeAppsEnabled are compiled in as a result. Without the
+symbol they fail to link.
+
+--- a/extensions/browser/pref_names.cc
++++ b/extensions/browser/pref_names.cc
+@@
+ const char kDeletedComponentExtensions[] =
+     "extensions.deleted_component_extensions";
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+-    BUILDFLAG(IS_FUCHSIA)
++    BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_ANDROID)
+ extern const char kChromeAppsEnabled[] = "extensions.chrome_apps_enabled";
+ #endif

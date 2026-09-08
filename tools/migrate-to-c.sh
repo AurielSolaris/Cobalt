@@ -26,7 +26,11 @@ echo
 # rebuilt from scratch anyway. Copying 6 GB of known-bad objects would only
 # reintroduce the link failure.
 echo "=== copying (excluding out/, which is corrupt)"
-rsync -a --info=progress2 --no-inc-recursive \
+# --partial keeps partial files so a retry resumes rather than restarting.
+# --no-inc-recursive was removed: it scans every file before transferring
+# anything, and on 1.1 million files against a failing disk that is time
+# spent not copying.
+rsync -a --partial --info=progress2 \
       --exclude 'src/out/' \
       "$SRC/" "$DEST/" 2> "$LOG"
 rc=$?
