@@ -12,19 +12,20 @@
 # that, so detaching is now the right answer rather than the broken one.
 
 # Resolve sibling tools relative to this script, not an absolute path.
-TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 set -uo pipefail
 
 SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 LOG="${LOG:-/opt/cobalt/build.log}"
 JOBS="${COBALT_JOBS:-6}"
-TOOLS=$TOOLS
 
 # Refuse to start a second one.
-if pgrep -f 'siso ninja' >/dev/null 2>&1; then
+# Match the siso binary itself, not any command line mentioning it -- a monitor
+# waiting on "siso ninja" otherwise looks like a running build and blocks this.
+if pgrep -x siso >/dev/null 2>&1; then
     echo "a build is already running:"
-    pgrep -af 'siso ninja' | head -2 | cut -c1-120
+    pgrep -ax siso | head -2 | cut -c1-120
     exit 1
 fi
 

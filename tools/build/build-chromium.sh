@@ -82,6 +82,28 @@ cc_wrapper = "ccache"
 # No remote execution available; be explicit rather than let it probe.
 use_remoteexec = false
 
+# --- Route B: extensions on Android -------------------------------------
+#
+# Upstream builds extensions for Android behind is_desktop_android. Setting it
+# puts //extensions/browser, //extensions/common and //chrome/browser/extensions
+# into chrome_public_apk's dependency graph; without it those labels do not
+# exist at all. See docs/decisions/0010-desktop-android-extensions.md.
+is_desktop_android = true
+
+# --- Identity ------------------------------------------------------------
+chrome_public_manifest_package = "app.auriel.cobalt"
+
+# --- Features Cobalt does not ship ---------------------------------------
+#
+# A phone that struggles with WebGL is not running WebXR workloads, and each of
+# these is binary size and attack surface for something this hardware will not
+# meaningfully use. WebHID has no GN flag -- it is runtime-gated -- so it is
+# turned off as a feature default instead.
+enable_vr = false
+enable_openxr = false
+enable_arcore = false
+enable_cardboard = false
+
 # Keep the resource-heavy extras off for the first build.
 enable_resource_allowlist_generation = false
 EOF
