@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 #
-# Resume the Chromium build after an interruption.
+# Resume or restart the Chromium build.
 #
-# ninja is incremental: every completed object on disk is kept and only
-# in-flight compiles are redone. So this does NOT discard out/ -- an earlier
-# version did, which is right after an I/O fault (half-written objects look
-# present but are corrupt) and wrong after a clean stop, where it throws away
-# hours of good work.
+#   tools/resume-build.sh            resume, keeping out/
+#   tools/resume-build.sh --clean    discard out/ and rebuild it
+#
+# Which one is right depends entirely on HOW the previous build stopped:
+#
+#   * Clean stop (killed, cancelled, VM shut down): resume. ninja is
+#     incremental and the objects on disk are good.
+#   * I/O fault: --clean. The filesystem check passing says the metadata is
+#     consistent; it says nothing about file CONTENTS written while the disk
+#     was failing. Objects come back half-written, siso's deps log records
+#     them as complete, and the failure surfaces much later as hundreds of
+#     "undefined symbol" errors at link time -- which read like a source
+#     problem and are not one.
 set -euo pipefail
 
 SRC="${SRC:-/build/chromium/m140/src}"
 OUT="${OUT:-out/Default}"
 JOBS="${COBALT_JOBS:-6}"
+CLEAN=0
+[ "${1:-}" = "--clean" ] && CLEAN=1
 
 export PATH="/build/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=0
@@ -22,17 +32,22 @@ cd "$SRC"
 
 echo "=== checkout"
 printf '  VERSION '; tr '\n' ' ' < chrome/VERSION; echo
-printf '  objects already built: %s\n' "$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)"
 
 echo
-echo "=== memory budget"
-free -h | head -2 | sed 's/^/  /'
-echo "  jobs: $JOBS"
-echo
-echo "  Heavy Blink and V8 translation units peak near 1 GB per clang. With a"
-echo "  10 GB cap, sixteen of them exhausted RAM and all 16 GB of swap, and the"
-echo "  build thrashed at 4 objects/min rather than failing outright."
+echo "=== volume"
+if touch /build/.rwprobe 2>/dev/null; then rm -f /build/.rwprobe; echo "  writable"
+else echo "  /build IS READ-ONLY -- disk failure, not a build problem" >&2; exit 1; fi
+
+if [ "$CLEAN" = 1 ]; then
+    echo
+    echo "=== discarding out/ (corrupt after an I/O fault)"
+    printf '  removing %s objects\n' "$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)"
+    rm -rf "$OUT"
+    bash /mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/tools/build-chromium.sh gen 2>&1 | tail -2
+else
+    printf '  objects kept: %s\n' "$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)"
+fi
 
 echo
-echo "=== building"
+echo "=== building with -j $JOBS"
 exec bash /mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/tools/build-chromium.sh build
