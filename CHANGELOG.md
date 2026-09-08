@@ -8,10 +8,25 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Stage 3 — upstream build (in progress)
-- Build host: Ubuntu 24.04 in WSL2 with depot_tools, on a 500 GB ext4 volume.
-- Fetching Chromium **140.0.7339.264** — the final M140 patch, so it carries every
-  security fix on that line.
+### Stage 3 — upstream build (complete, 0.3.0)
+- **Chromium 140.0.7339.264 builds from source and runs on a device.** 303 MB APK,
+  209 MB `libchrome.so`, verified as a real artifact rather than by exit code.
+  Loads pages over HTTPS, renders correctly, scrolls, navigates, survives rotation
+  and a background cycle with zero crashes — `docs/gate-a-results.md`.
+- Build configuration tuned to the host rather than to defaults. `autoninja` sizes
+  `-j` from CPU count and ignores memory; at 16 jobs against a 10 GB cap the build
+  exhausted RAM and all 16 GB of swap and thrashed at 4 objects/min, which reads as
+  slowness rather than misconfiguration. `-j 6` is the working figure.
+- Build tree moved from an external SSD to the internal disk after that drive failed
+  four times: write errors forcing a read-only remount, objects corrupted in a way a
+  clean `e2fsck` does not detect, then unreadable source files. All three failure
+  modes and the repair procedure are in `docs/build.md`.
+- ccache configured for subsequent builds; not enabled retroactively, since
+  `cc_wrapper` changes every compile command and would have invalidated the tree.
+- Decisions recorded: MV2 support (0005), bundled uBlock Origin (0006), user themes
+  (0007), performance strategy (0008), page diagnostics (0009).
+- Cobalt has its own mark — inverted from Kiwi's, attributed under BSD 3-Clause.
+- `tools/` reorganised into build/, monitor/, disk/, patches/, device/, assets/.
 
 ### Stage 2 — classification (completes 0.2.0)
 - Classified all 277 patches — `docs/patch-classification.md`. **About a third of
