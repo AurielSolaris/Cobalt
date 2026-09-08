@@ -3,6 +3,8 @@
 # the 16-job build thrashed at 4 objects/min for hours and looked merely slow.
 OUT=/opt/cobalt/chromium/m140/src/out/Default
 SRCROOT=/opt/cobalt/chromium/m140/src
+# Reference point for "newer than this build": the log is truncated at start.
+LOGREF=${LOGREF:-/opt/cobalt/build.log}
 APK=$OUT/apks/ChromePublic.apk
 INTERVAL="${INTERVAL:-300}"
 prev=-1
@@ -43,7 +45,10 @@ while true; do
     echo "DISK LOW: ${freeg}GB free on the build filesystem -- stop before it fills"
   fi
 
-  if [ -f "$APK" ]; then
+  # An APK older than this build is the PREVIOUS build's artifact. Reporting it
+  # as completion is the fourth false-success this project has produced, so the
+  # check is "newer than the log we are watching", not "exists".
+  if [ -f "$APK" ] && [ "$APK" -nt "$LOGREF" ]; then
     echo "BUILD COMPLETE: ChromePublic.apk $(du -h "$APK" | cut -f1), $n objects"
     exit 0
   fi
