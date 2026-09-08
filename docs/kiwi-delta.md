@@ -167,7 +167,7 @@ The first extraction reported **0 identical out of 378** — every file changed.
 was wrong. `.ref/kiwi` had been cloned on Windows, where git rewrote it to CRLF;
 upstream Chromium is LF, so every text file differed by invisible `\r` bytes alone.
 
-The overlay is now cloned inside Linux, and `tools/extract-kiwi-delta.sh` refuses to
+The overlay is now cloned inside Linux, and `tools/patches/extract-kiwi-delta.sh` refuses to
 run if it samples an overlay with CRLF endings. A result of "100% modified" is a bug
 report, not a finding.
 

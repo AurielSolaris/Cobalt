@@ -84,7 +84,7 @@ shipped list, and only downloading a chosen face touches the network.
 
 ### What the catalogue holds, and the woff2 subset wrinkle
 
-`tools/fetch-google-fonts.py` writes `modules/app/src/main/assets/google-fonts.json`:
+`tools/assets/fetch-google-fonts.py` writes `modules/app/src/main/assets/google-fonts.json`:
 1,895 proportional families and 51 monospace, about 207 KB. Per family: name,
 category, available weights, whether it has italics, popularity rank, and the
 scripts it covers.

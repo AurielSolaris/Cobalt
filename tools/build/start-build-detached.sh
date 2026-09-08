@@ -10,12 +10,16 @@
 # This was tried before and blamed for silent deaths, but the cause then was the
 # WSL VM itself cycling and taking everything with it. vmIdleTimeout=-1 fixes
 # that, so detaching is now the right answer rather than the broken one.
+
+# Resolve sibling tools relative to this script, not an absolute path.
+TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 set -uo pipefail
 
 SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 LOG="${LOG:-/opt/cobalt/build.log}"
 JOBS="${COBALT_JOBS:-6}"
-TOOLS=/mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/tools
+TOOLS=$TOOLS
 
 # Refuse to start a second one.
 if pgrep -f 'siso ninja' >/dev/null 2>&1; then

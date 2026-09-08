@@ -5,6 +5,10 @@
 # The copy came off a drive that had already failed to read a file it wrote
 # days earlier, so "the copy finished" is not evidence the checkout is sound.
 # git fsck is, for everything git tracks.
+
+# Resolve sibling tools relative to this script, not an absolute path.
+TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 set -uo pipefail
 
 SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
@@ -38,8 +42,8 @@ fi
 
 echo
 echo "=== empty DEPS entries"
-bash /mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/tools/verify-deps.sh "$SRC" 2>&1 | tail -3
+bash $TOOLS/verify-deps.sh "$SRC" 2>&1 | tail -3
 
 echo
 echo "=== building"
-exec bash /mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/tools/resume-build.sh --clean
+exec bash $TOOLS/resume-build.sh --clean

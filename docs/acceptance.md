@@ -27,7 +27,7 @@ The port's first real proof point.
 
 **Build**
 - [ ] Applies batch 1 and still compiles.
-- [ ] `tools/cobalt-mv2-defaults.py --check` exits 0 (all four flags correct).
+- [ ] `tools/patches/cobalt-mv2-defaults.py --check` exits 0 (all four flags correct).
 
 **MV2 is genuinely supported, not tolerated**
 - [ ] An MV2 extension installs from a `.crx`.

@@ -15,6 +15,10 @@
 #     them as complete, and the failure surfaces much later as hundreds of
 #     "undefined symbol" errors at link time -- which read like a source
 #     problem and are not one.
+
+# Resolve sibling tools relative to this script, not an absolute path.
+TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 set -euo pipefail
 
 SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
@@ -43,11 +47,11 @@ if [ "$CLEAN" = 1 ]; then
     echo "=== discarding out/ (corrupt after an I/O fault)"
     printf '  removing %s objects\n' "$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)"
     rm -rf "$OUT"
-    bash /mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/tools/build-chromium.sh gen 2>&1 | tail -2
+    bash $TOOLS/build-chromium.sh gen 2>&1 | tail -2
 else
     printf '  objects kept: %s\n' "$(find "$OUT/obj" -name '*.o' 2>/dev/null | wc -l)"
 fi
 
 echo
 echo "=== building with -j $JOBS"
-exec bash /mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/tools/build-chromium.sh build
+exec bash $TOOLS/build-chromium.sh build

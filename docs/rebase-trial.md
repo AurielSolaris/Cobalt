@@ -4,8 +4,8 @@ The first real measurement of Stage 5a's cost, taken before compiling anything.
 `git apply --check` reports whether each patch would apply without modifying the
 tree, so this ran against `src` while its dependencies were still downloading.
 
-Produced by `tools/try-patches.sh`; cross-referenced with the keep/drop
-classification by `tools/trial-vs-class.sh`.
+Produced by `tools/patches/try-patches.sh`; cross-referenced with the keep/drop
+classification by `tools/patches/trial-vs-class.sh`.
 
 **Series:** 277 patches extracted from Kiwi at Chromium 105.0.5195.24
 **Target:** Chromium 140.0.7339.264 — 35 milestones, three years
@@ -72,7 +72,7 @@ Chromium migrated its WebUI off Polymer/HTML to Lit and TypeScript.
 
 This was initially flagged as the trial's top risk. **That was an overestimate,
 made before measuring Kiwi's actual change**, and the measurement (via
-`tools/check-webui-migration.sh`) is reassuring on both counts:
+`tools/patches/check-webui-migration.sh`) is reassuring on both counts:
 
 - **Every file has an obvious successor.** `manager.html` became `manager.html.ts`
   plus `manager.ts` and `manager.css`, and the same for the other four. The
@@ -134,15 +134,15 @@ Two things it does add:
    migration looked like the top risk until it was measured at 55 added lines
    against files with direct successors. The real cost sits in the 35 extension
    C++ conflicts and 5 relocated files — tedious, well-understood work.
-2. **A regression baseline now exists.** Re-running `tools/try-patches.sh` after
+2. **A regression baseline now exists.** Re-running `tools/patches/try-patches.sh` after
    each hop gives a number to compare against, so progress on Stage 5 is
    measurable rather than felt.
 
 ## Reproducing
 
 ```sh
-tools/try-patches.sh patches/kiwi-105 /build/chromium/m140/src /build/patch-trial
-tools/trial-vs-class.sh /build/patch-trial patches/kiwi-105
+tools/patches/try-patches.sh patches/kiwi-105 /opt/cobalt/chromium/m140/src /opt/cobalt/patch-trial
+tools/patches/trial-vs-class.sh /opt/cobalt/patch-trial patches/kiwi-105
 ```
 
 Read-only — safe to run against a tree that is still syncing.

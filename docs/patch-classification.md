@@ -2,7 +2,7 @@
 
 What Cobalt carries forward to Chromium 140, what it drops, and why.
 
-Signals gathered by `tools/classify-patches.sh`; the verdicts below are reviewed
+Signals gathered by `tools/patches/classify-patches.sh`; the verdicts below are reviewed
 by hand. Numbers are added lines, which is the honest measure of rebase cost —
 a 700-line insertion into Blink's fetch path is not comparable to a 3-line
 string change.

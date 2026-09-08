@@ -5,7 +5,7 @@
 # every text file differs from Chromium's LF and the whole diff is noise.
 set -uo pipefail
 
-OVERLAY="${1:-/mnt/c/Users/Auriel/Documents/app.auriel/Cobalt/.ref/kiwi}"
+OVERLAY="${1:-${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/.ref/kiwi}"
 UPSTREAM="${2:-/build/chromium/src-105}"
 
 echo "=== git config in the overlay clone"

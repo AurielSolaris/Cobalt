@@ -1,6 +1,23 @@
-# Cobalt
+<p align="center">
+  <img src="branding/generated/icon-256.png" alt="Cobalt" width="128" height="128">
+</p>
 
-A revival of [Kiwi Browser](https://github.com/kiwibrowser) for Android.
+<h1 align="center">Cobalt</h1>
+
+<p align="center">
+  A revival of <a href="https://github.com/kiwibrowser">Kiwi Browser</a> for Android.
+</p>
+
+<p align="center">
+  <em>The mark is inspired by Kiwi Browser's own, and inverted — a blue bird on a
+  dark ground where the original is a white bird on a coloured one. The silhouette
+  carries the lineage; the inversion says this is a separate project, not something
+  Kiwi ships. Derived from <code>kiwi_logo_circle.svg</code>, Copyright &copy; 2022
+  Geometry OU (Kiwi Browser), BSD 3-Clause. Neither the Kiwi Browser name nor
+  Geometry OU endorses Cobalt.</em>
+</p>
+
+---
 
 Kiwi is a Chromium fork whose defining feature — desktop-class extension support on
 mobile — has gone unmaintained. Cobalt picks the project up, carries its patches
@@ -15,6 +32,15 @@ It is three things at once, and the distinction between them is the whole design
 | **Rewrite** | The Android shell above the engine — UI, address bar, tabs, settings | Written fresh in Kotlin and Compose rather than inherited from Kiwi's Java. This is the part we own. |
 
 **App ID:** `app.auriel.cobalt` · **Repository:** <https://github.com/AurielSolaris/Cobalt>
+
+
+## Status
+
+Stage 3 complete. Chromium 140 builds from source and produces a working APK,
+verified on device — see [`docs/gate-a-results.md`](docs/gate-a-results.md).
+Kiwi's patches are triaged and measured but not yet ported; that is Stage 5.
+
+---
 
 ### Extensions: both MV2 and MV3
 

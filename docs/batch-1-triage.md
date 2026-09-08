@@ -69,7 +69,7 @@ header. Needs an observer on our side of the boundary.
 ## Landing order
 
 1. The 8 take-as-is patches — verify the tree still builds.
-2. MV2 defaults via `tools/cobalt-mv2-defaults.py` — no Kiwi patch involved.
+2. MV2 defaults via `tools/patches/cobalt-mv2-defaults.py` — no Kiwi patch involved.
 3. The 2 rewrites.
 4. The 2 reimplementations.
 5. `chrome_extensions_browser_client.cc` and the relocated factory file.

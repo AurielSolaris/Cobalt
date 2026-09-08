@@ -92,16 +92,16 @@ removing it is deleting one file.
 ### The sequence
 
 ```sh
-tools/setup-build-host.sh                  # as root: mount, deps, depot_tools
-tools/fetch-chromium.sh                    # ~36 GB, pinned revision
-tools/build-chromium.sh deps               # as root: Chromium's own installer
-tools/build-chromium.sh hooks              # NDK, SDK, toolchains
-tools/check-gn-args.sh                     # verify args before gn gen
-tools/build-chromium.sh gen                # write args.gn, run gn gen
-tools/build-chromium.sh build              # autoninja the APK
+tools/build/setup-build-host.sh                  # as root: mount, deps, depot_tools
+tools/build/fetch-chromium.sh                    # ~36 GB, pinned revision
+tools/build/build-chromium.sh deps               # as root: Chromium's own installer
+tools/build/build-chromium.sh hooks              # NDK, SDK, toolchains
+tools/build/check-gn-args.sh                     # verify args before gn gen
+tools/build/build-chromium.sh gen                # write args.gn, run gn gen
+tools/build/build-chromium.sh build              # autoninja the APK
 ```
 
-`tools/sync-progress.sh` and `tools/build-progress.sh` report progress; neither
+`tools/monitor/sync-progress.sh` and `tools/monitor/build-progress.sh` report progress; neither
 touches the checkout.
 
 ### Things that cost us hours, so they are written down
@@ -187,7 +187,7 @@ trustworthy health signal for a disk passed through to WSL.
    with `EBUSY` — and that open is what e2fsck actually tests.
 
 The sequence that works: disable the fstab entry, `wsl --shutdown`, re-attach
-the VHDX, boot with nothing mounting it, then check. `tools/fsck-volume.sh`
+the VHDX, boot with nothing mounting it, then check. `tools/disk/fsck-volume.sh`
 does this.
 
 ### Build sizing, learned the slow way
