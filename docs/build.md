@@ -138,3 +138,64 @@ delete `.gradle/configuration-cache`.
 
 **A Kotlin/Native target fails to resolve on first build** — the toolchain downloads
 on demand; the first build of `linuxX64` or `mingwX64` needs network access.
+
+## The build volume: three failures on a USB SSD
+
+Recorded because the symptoms were misleading each time, and the same
+misreading would cost days again.
+
+The build lived on a 500 GB ext4 VHDX on an external SanDisk Portable SSD. It
+failed three times under sustained build load, presenting differently each time:
+
+**1. Write errors → read-only remount.** ext4 saw write failures on the
+superblock and remounted `/build` read-only to protect the data. Every compile
+then failed with `unable to open output file: 'Read-only file system'`, which
+siso reported as 107 compiler errors. One hardware fault wearing a hundred
+disguises.
+
+**2. Corrupted output surviving a clean fsck.** After a repair that reported
+*clean, no errors*, the resumed build failed at link time with hundreds of
+`undefined symbol` errors against V8 Torque builtins, and siso reported its own
+deps log damaged. `localexec` reported zero compile errors that run and the
+volume stayed writable throughout — the objects were not being produced badly
+then, they had been produced badly earlier and kept.
+
+> **A passing `e2fsck` says the filesystem metadata is consistent. It says
+> nothing about the contents of files written while the disk was failing.**
+> Half-written objects look present, the deps log records them complete, and the
+> damage surfaces hours later looking like a source problem.
+
+**3. Read errors.** The drive failed to *read* `third_party/angle/src/libANGLE/
+Stream.cpp` — a file written days earlier and verified by `e2fsck` an hour
+before — with 14 consecutive I/O errors on one sector. Writes failing costs
+time; reads failing costs data.
+
+Windows logged **zero** Event 153 retries during that last hour while the Linux
+kernel recorded continuous I/O errors. The Windows-side counter is not a
+trustworthy health signal for a disk passed through to WSL.
+
+### Repairing a WSL bare-mounted volume
+
+`e2fsck` could not run, for three stacked reasons:
+
+1. A `umount -l` fallback leaves the filesystem live; e2fsck aborts with exit 8
+   while the caller sees a writable volume and assumes it was checked. **Never
+   lazy-unmount before a check.**
+2. systemd's fstab-generator remounts the volume the instant it is unmounted.
+3. **WSL's bare-disk attachment holds an exclusive claim on the block device.**
+   `/proc/mounts` showed zero references while `O_RDONLY|O_EXCL` still failed
+   with `EBUSY` — and that open is what e2fsck actually tests.
+
+The sequence that works: disable the fstab entry, `wsl --shutdown`, re-attach
+the VHDX, boot with nothing mounting it, then check. `tools/fsck-volume.sh`
+does this.
+
+### Build sizing, learned the slow way
+
+- A clean `chrome_public_apk` is **70,491 edges**. Earlier 40–50k guesses,
+  extrapolated from object counts, were wrong.
+- `autoninja` sizes `-j` from **CPU count and ignores memory**. On 16 cores with
+  a 10 GB cap, heavy Blink and V8 units peak near 1 GB per clang; sixteen of them
+  exhausted RAM and all 16 GB of swap. The build did not fail — it thrashed at
+  4 objects/min with 60% I/O wait, which reads as slowness rather than
+  misconfiguration. `-j 6` is the working figure here.
