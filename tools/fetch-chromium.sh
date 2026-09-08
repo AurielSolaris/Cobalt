@@ -16,7 +16,7 @@ set -euo pipefail
 TAG="${1:-140.0.7339.264}"
 DIR="${2:-/build/chromium/m140}"
 
-export PATH="/build/depot_tools:$PATH"
+export PATH="/opt/cobalt/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=0
 export DEPOT_TOOLS_METRICS=0
 

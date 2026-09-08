@@ -45,18 +45,18 @@ echo "python3  $(python3 --version)"
 
 echo
 echo "=== depot_tools"
-if [ ! -d /build/depot_tools ]; then
+if [ ! -d /opt/cobalt/depot_tools ]; then
     git clone -q https://chromium.googlesource.com/chromium/tools/depot_tools.git \
-        /build/depot_tools
+        /opt/cobalt/depot_tools
     echo "cloned"
 else
-    git -C /build/depot_tools pull -q --ff-only || true
+    git -C /opt/cobalt/depot_tools pull -q --ff-only || true
     echo "already present, updated"
 fi
 
 # Chromium's tooling is noisy about metrics; opt out once, explicitly.
 mkdir -p /build/.config
-cat > /build/depot_tools/.disable_auto_update <<'EOF'
+cat > /opt/cobalt/depot_tools/.disable_auto_update <<'EOF'
 Auto-update disabled so a long fetch cannot be changed underneath itself.
 EOF
 
@@ -69,12 +69,12 @@ EOF
 #
 # ensure_bootstrap may fail partway on luci-auth, which is a CIPD tool we do
 # not use; the file we need is written before that point.
-if [ ! -f /build/depot_tools/python3_bin_reldir.txt ]; then
+if [ ! -f /opt/cobalt/depot_tools/python3_bin_reldir.txt ]; then
     echo "bootstrapping depot_tools"
-    (cd /build/depot_tools && ./ensure_bootstrap >/dev/null 2>&1) || true
-    [ -f /build/depot_tools/python3_bin_reldir.txt ]         && echo "  python3_bin_reldir.txt written"         || echo "  WARNING: bootstrap did not produce python3_bin_reldir.txt"
+    (cd /opt/cobalt/depot_tools && ./ensure_bootstrap >/dev/null 2>&1) || true
+    [ -f /opt/cobalt/depot_tools/python3_bin_reldir.txt ]         && echo "  python3_bin_reldir.txt written"         || echo "  WARNING: bootstrap did not produce python3_bin_reldir.txt"
 fi
 
 echo
 echo "=== ready"
-echo "PATH needs: export PATH=/build/depot_tools:\$PATH"
+echo "PATH needs: export PATH=/opt/cobalt/depot_tools:\$PATH"

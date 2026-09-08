@@ -23,7 +23,7 @@ JOBS="${COBALT_JOBS:-6}"
 CLEAN=0
 [ "${1:-}" = "--clean" ] && CLEAN=1
 
-export PATH="/build/depot_tools:$PATH"
+export PATH="/opt/cobalt/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=0
 export DEPOT_TOOLS_METRICS=0
 export COBALT_JOBS="$JOBS"

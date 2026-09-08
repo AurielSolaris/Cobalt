@@ -6,7 +6,7 @@ SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 OUT="${OUT:-out/Default}"
 TARGET="${1:-chrome_public_apk}"
 
-export PATH="/build/depot_tools:$PATH"
+export PATH="/opt/cobalt/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=0
 export DEPOT_TOOLS_METRICS=0
 
