@@ -29,7 +29,11 @@ if pgrep -x siso >/dev/null 2>&1; then
     exit 1
 fi
 
+# The watcher's completion test needs a FIXED instant to compare the APK
+# against. It cannot use the log: the log keeps being written after the APK is
+# linked, so the APK would never be "newer" and completion would never fire.
 : > "$LOG"
+: > "${STAMP:-/opt/cobalt/build.start}"
 setsid nohup env COBALT_JOBS="$JOBS" SRC="$SRC" \
     bash "$TOOLS/resume-build.sh" >> "$LOG" 2>&1 < /dev/null &
 

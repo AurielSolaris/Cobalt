@@ -11,6 +11,13 @@ local.properties
 build/
 */build/
 **/build/
+
+# The three rules above match a directory named "build" at any depth, so they
+# also swallow tools/build -- where this project's own build scripts live. The
+# existing scripts are tracked only because they predate the rules; any NEW
+# script there would be silently dropped by git add. The last matching rule
+# wins, so this re-include must stay below all three.
+!tools/build/
 .gradle/
 .kotlin/
 captures/
