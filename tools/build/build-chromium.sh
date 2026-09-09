@@ -5,9 +5,10 @@
 # Usage:
 #   tools/build-chromium.sh deps     install Chromium's build dependencies (root)
 #   tools/build-chromium.sh hooks    run gclient hooks (toolchains, NDK, SDK)
+#   tools/build-chromium.sh patch    apply Cobalt's patch series (tools/patches/series.txt)
 #   tools/build-chromium.sh gen      write out/Default/args.gn and run gn gen
 #   tools/build-chromium.sh build    autoninja the APK
-#   tools/build-chromium.sh all      hooks + gen + build
+#   tools/build-chromium.sh all      hooks + patch + gen + build
 #
 # Run `deps` as root once; everything else as a normal user.
 
@@ -15,6 +16,8 @@ set -euo pipefail
 
 SRC="${SRC:-/opt/cobalt/chromium/m140/src}"
 OUT="${OUT:-out/Default}"
+# Resolved before the cd into $SRC below.
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 export PATH="/opt/cobalt/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=0
@@ -123,6 +126,14 @@ case "${1:-all}" in
     gclient runhooks
     ;;
 
+  patch)
+    # Apply Cobalt's declared patch series. Must run after `hooks`, because
+    # gclient sync resets third_party/search_engines_data/resources -- a git
+    # submodule that carries the search engine changes and that src's own
+    # `git status` never reports as dirty.
+    "$REPO/tools/patches/apply-all.sh"
+    ;;
+
   gen)
     write_args
     echo "=== gn gen $OUT"
@@ -158,6 +169,7 @@ case "${1:-all}" in
 
   all)
     gclient runhooks
+    "$REPO/tools/patches/apply-all.sh"
     write_args
     gn gen "$OUT"
     autoninja -C "$OUT" -j "${COBALT_JOBS:-6}" chrome_public_apk

@@ -41,6 +41,14 @@ for name in "$@"; do
         grep -E "^[+]" "$f" | grep -E "$DISABLERS" | sed 's/^/      /' | head -3
         failed=$((failed+1)); FAILED+=("$name"); continue
     fi
+    # An already-applied patch fails --check, which would make the series
+    # non-idempotent -- and the series has to be re-runnable, because gclient
+    # sync resets a submodule that carries part of it. --reverse --check
+    # succeeds exactly when the patch is already in the tree.
+    if git apply --reverse --check "$f" 2>/dev/null; then
+        printf '  %-58s already applied
+' "$name"; ok=$((ok+1)); continue
+    fi
     if git apply --check "$f" 2>/dev/null; then
         git apply "$f" && { printf '  %-58s applied\n' "$name"; ok=$((ok+1)); }
     elif git apply --check -C1 "$f" 2>/dev/null; then
@@ -54,5 +62,12 @@ done
 
 echo
 echo "applied $ok, fuzzy $fuzzy, failed $failed"
-[ "$failed" -gt 0 ] && { echo "failed:"; printf '  %s\n' "${FAILED[@]}"; }
+# Exit non-zero when anything failed. This used to `exit 0` unconditionally,
+# which reported a partially-patched tree as a success -- the same class of
+# silent-success bug as the build watcher checking for a stale APK. A caller
+# that cannot tell a refused patch from an applied one is worse than none.
+if [ "$failed" -gt 0 ]; then
+    echo "failed:"; printf '  %s\n' "${FAILED[@]}"
+    exit 1
+fi
 exit 0

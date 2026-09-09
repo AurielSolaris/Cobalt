@@ -22,9 +22,15 @@ gradlew.bat text eol=crlf
 patches/** -text
 *.patch -text
 
-# Build scripts run in WSL/Linux.
-tools/*.sh text eol=lf
-tools/*.py text eol=lf
+# Build scripts run in WSL/Linux. The globs have to be recursive: the originals
+# matched only tools/ itself, so tools/patches/apply-all.sh was checked out CRLF
+# on Windows and bash rejected it at the first line.
+tools/**/*.sh text eol=lf
+tools/**/*.py text eol=lf
+
+# Read line-by-line by apply-all.sh; a trailing CR would end up inside a script
+# argument.
+tools/patches/series.txt text eol=lf
 
 # Generated catalogue: byte-compared by tools/fetch-google-fonts.py --check.
 # CRLF conversion on checkout would make a fresh clone report STALE against an

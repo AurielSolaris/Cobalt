@@ -43,6 +43,10 @@ modules/app       Android Compose shell
 
 ## Building Chromium (Stage 3 onward)
 
+> **Reproducing a full Cobalt APK, patches included, is in
+> [`reproducible-build.md`](reproducible-build.md).** This section covers what
+> the scripts assume about the host; that one covers the pipeline.
+
 A different exercise entirely: tens of gigabytes and a build measured in hours.
 Everything below is scripted in `tools/`; this explains what the scripts assume.
 

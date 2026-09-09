@@ -71,6 +71,9 @@ and an `fsck` aimed at yesterday's letter once pointed at the distro root.
 | `apply-batch.sh` | Apply a named batch, reporting each patch rather than stopping at the first failure |
 | `cobalt-chromesearch-scheme.py` | Port Kiwi's chrome-search URL pattern to M140, where the constant moved up a layer |
 | `cobalt-search-engines.py` | Offer Ecosia, Kagi and Qwant in every region |
+| `cobalt-mv2-action-schemas.py` | Ship the MV2 browserAction/pageAction schemas on Android; without them the renderer aborts |
+| `cobalt-saf-file-enumerator.py` | Let `base::FileEnumerator` list `/SAF/` paths, so localised extensions can side-load |
+| `cobalt-bundle-ublock.py` | Stage the uBO CRX into the APK, install it, and make it disableable-but-not-removable |
 
 `apply-batch.sh` is also a **gate**. It refuses any patch whose added lines
 contain `#if 0`, `&& 0` or `|| true`. One such patch reached the tree and had
@@ -102,6 +105,7 @@ target at all. See [decision 0005](../docs/decisions/0005-support-mv2-and-mv3.md
 | `fetch-google-fonts.py` | Bake the Google Fonts catalogue into the app at build time |
 | `brand-chromium.py` | Product name and launcher icons |
 | `brand-android-logos.py` | The logos Android shows *after* the launcher icon: splash, first-run, wordmark |
+| `brand-launcher-layers.py` | The launcher layers `brand-chromium.py` misses: the round icon's background and the monochrome themed icon |
 | `brand-strings.py` | Rename the product in user-facing strings only |
 | `fetch-ublock.py` | Fetch uBlock Origin, pinned by version **and** sha256 |
 | `pack-crx.py` | Pack an unpacked extension into a signed CRX3 |

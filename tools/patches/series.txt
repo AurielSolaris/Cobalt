@@ -1,0 +1,91 @@
+# Cobalt's patch series, in application order.
+#
+# This file is the answer to "how do I reproduce your APK". Every change Cobalt
+# makes to Chromium is listed here, and tools/patches/apply-all.sh runs the list
+# top to bottom. Nothing else is applied by hand -- if a change is not in this
+# file, it does not exist as far as a fresh checkout is concerned.
+#
+# Format, one entry per line:
+#
+#   <kind> <argument...>
+#
+#   kiwi   <patch-name>       apply patches/kiwi-105/<name>.patch via apply-batch.sh
+#   tool   <script> [args]    run a script from tools/, relative to the repo root
+#   note   <text>             printed, does nothing -- section headings
+#
+# $SRC expands to the Chromium checkout. Every tool must be idempotent: the
+# series is re-run after every gclient sync, and a second run must be a no-op.
+
+note ===== Batch 1: extension core plumbing (docs/batch-1-triage.md) =====
+
+# The eight patches that apply as-is. extension_protocols.cc is deliberately
+# absent: it disabled AllowExtensionResourceLoad, and apply-batch.sh now refuses
+# the whole class. See docs/decisions/0011-refuse-mechanical-disablers.md.
+kiwi extensions_common_url_pattern.h
+# The line this adds is rewritten later by cobalt-chromesearch-scheme.py, so
+# a reverse-apply check cannot recognise it. Match on the mask instead.
+kiwi extensions_common_url_pattern.cc :: SCHEME_CHROMESEARCH
+kiwi extensions_common_extension.cc
+kiwi extensions_common_manifest_handlers_permissions_parser.cc
+kiwi extensions_common_manifest_handlers_csp_info.cc
+# Applied with fuzz, so the reverse check does not match it either.
+kiwi extensions_common_user_script.cc :: SCHEME_CHROMESEARCH
+
+note ===== Cobalt's own ports and rewrites =====
+
+# Kiwi's "|| true" platform hacks, re-expressed as real Android conditions.
+tool patches/cobalt-android-conditions.py --src $SRC
+
+# content::kChromeSearchScheme moved up a layer between M105 and M140.
+tool patches/cobalt-chromesearch-scheme.py $SRC
+
+# MV2 enabled by default. Decision 0005 -- never remove this.
+tool patches/cobalt-mv2-defaults.py --src $SRC
+
+# MV2's browserAction/pageAction schemas, which upstream ships only when
+# enable_extensions is set. Without them the renderer aborts on any MV2
+# extension with a browser_action -- uBlock Origin included.
+tool patches/cobalt-mv2-action-schemas.py $SRC
+
+note ===== Search engines =====
+
+# WARNING: this one writes into third_party/search_engines_data/resources,
+# which is a git SUBMODULE. `gclient sync` and `git submodule update` both
+# discard it silently, and src's own `git status` will never show it as dirty.
+# That is exactly why the series has to be re-runnable rather than a one-off.
+tool patches/cobalt-search-engines.py $SRC
+
+note ===== Branding =====
+
+tool assets/brand-chromium.py --src $SRC
+tool assets/brand-android-logos.py --src $SRC
+
+# The launcher icon is three layers, not one. brand-chromium.py replaces the
+# square foreground; these are the round icon's background and the monochrome
+# themed icon, both of which were still Chromium's pinwheel.
+tool assets/brand-launcher-layers.py --src $SRC
+tool assets/brand-strings.py --src $SRC
+
+note ===== Android platform fixes =====
+
+# base::FileEnumerator never handled /SAF/ virtual document paths, which is
+# why every localised extension failed to side-load. See
+# docs/extension-loading-android.md.
+tool patches/cobalt-saf-file-enumerator.py $SRC
+
+note ===== Bundled extensions =====
+
+# Stages the signed uBO CRX into the APK and configures the policy that makes
+# it disableable but not removable. Decision 0006.
+tool patches/cobalt-bundle-ublock.py $SRC
+
+# ---------------------------------------------------------------------------
+# NOT in the series, deliberately:
+#
+#   cobalt-full-extensions-android.py   Route A -- enable_extensions=true
+#   cobalt-platform-apps-guards.py      alongside is_desktop_android. Parked on
+#   cobalt-android-extensions-graph.py  a remaining //apps reference; see
+#   cobalt-circular-includes.py         docs/decisions/0010.
+#
+# They are real work in progress, not dead code, but the shipped build is
+# Route B and adding them here would break a fresh checkout.
