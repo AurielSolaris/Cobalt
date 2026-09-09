@@ -36,9 +36,21 @@ It is three things at once, and the distinction between them is the whole design
 
 ## Status
 
-Stage 3 complete. Chromium 140 builds from source and produces a working APK,
-verified on device — see [`docs/gate-a-results.md`](docs/gate-a-results.md).
-Kiwi's patches are triaged and measured but not yet ported; that is Stage 5.
+**Extensions work on Android.** Chromium 140 builds as Cobalt and runs on device
+with the extension subsystem compiled in: an MV2 extension installs, survives a
+restart still enabled, and its `webRequestBlocking` listener genuinely blocks
+requests — verified, with a control test, in
+[`docs/gate-b-results.md`](docs/gate-b-results.md). MV3 runs alongside it.
+
+That arrived earlier than the roadmap expected, because upstream turned out to
+already build the extension system for Android behind `is_desktop_android`
+([decision 0010](docs/decisions/0010-desktop-android-extensions.md)) — no patch
+of ours was needed to switch it on.
+
+In progress: bundling uBlock Origin as a preinstalled extension, and porting the
+rest of Kiwi's patch set. Two of its patches have been **refused** rather than
+ported, one of which had disabled a security check
+([decision 0011](docs/decisions/0011-refuse-mechanical-disablers.md)).
 
 ---
 
@@ -71,9 +83,13 @@ a post-1.0 experiment behind a build flag that is off by default; see Stage 12 o
 project plan. The engine interface in `:modules:core` is kept engine-neutral so that
 experiment stays possible, and for no other reason.
 
-## Status
+## The 0.1.0 shell
 
-Pre-alpha. **Milestone 0.1.0 works**: type an address, and the page is fetched, parsed,
+Cobalt is two programs until Stage 6 joins them. The Chromium tree above is what
+installs and browses today; the Compose shell below is the chassis its UI will be
+rebuilt from, and it still runs against its own bring-up renderer.
+
+**Milestone 0.1.0 works**: type an address, and the page is fetched, parsed,
 and rendered on device. Links navigate. Tabs and incognito tabs work.
 
 What is real today:
@@ -136,8 +152,11 @@ on, that page can show your own most-visited sites — earned, not sold.
 
 ## Branches
 
-`nightly` is the integration line and everything lands there first; `stable` is the
-release line and only ever receives merges from `nightly`.
+`nightly` is the integration line and everything lands there first. `stable` is the
+release line, and **it is dormant** — nothing has been promoted to it yet. Three
+things gate the first release: uBlock Origin bundled and working, Google Play
+Services removed entirely, and Cobalt's own shell in place of Chromium's Android
+UI. Until then `nightly` is the only line that means anything.
 
 From 0.2.0 to 1.0.0 every milestone also keeps a `nightly-0.x.0` and a
 `stable-0.x.0`, and those are never deleted. The risk in this project is

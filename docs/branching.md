@@ -2,6 +2,28 @@
 
 Cobalt maintains two long-lived branches. Both are always buildable.
 
+## `stable` is dormant, not parallel
+
+**Nothing has been promoted to `stable`, and nothing will be for a while.** It
+exists so the model is in place before it is needed; it is not a release line
+running alongside `nightly` today, and the docs should not imply that it is.
+
+Three things gate the first promotion, and they are product requirements rather
+than a quality bar to be argued down:
+
+1. **uBlock Origin works** as a bundled extension — installed, blocking, and
+   disableable but not uninstallable. See
+   [decision 0006](decisions/0006-bundle-ublock-origin.md).
+2. **Google Play Services is gone.** No GMS dependency anywhere in the build,
+   including the password path, which today is disabled outright without it. See
+   [decision 0012](decisions/0012-own-password-store.md).
+3. **Cobalt's own shell**, not Chromium's Android UI. Stage 6 joins the Compose
+   shell to the content layer; until then the app ships Chromium's interface with
+   Cobalt's name on it, which is a bring-up state and not a release.
+
+Until all three hold, `nightly` is the only line that means anything. Treat a
+`stable` reference in older docs as aspirational.
+
 | Branch | Purpose | Receives | Gate |
 |---|---|---|---|
 | `nightly` | Integration line. All feature work, patches, and upstream rebases land here first. | feature branches, upstream rebases | builds clean, unit tests pass |
