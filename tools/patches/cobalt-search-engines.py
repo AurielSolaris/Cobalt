@@ -25,8 +25,14 @@ from pathlib import Path
 
 ADD = ["ecosia", "kagi", "qwant"]
 
+# The largest regional list after our additions. Non-EEA regions are truncated
+# to this many engines, so it has to cover the longest list we produce.
+WANT_VISIBLE = 12
+
 SRC = Path(sys.argv[1] if len(sys.argv) > 1 else "/opt/cobalt/chromium/m140/src")
 TARGET = SRC / "third_party/search_engines_data/resources/definitions/regional_settings.json"
+ENGINES = SRC / "third_party/search_engines_data/resources/definitions/prepopulated_engines.json"
+THRESHOLD = SRC / "components/regional_capabilities/regional_capabilities_utils.cc"
 
 ENTRY = re.compile(r'^(\s*)"&([a-z0-9_]+)",?\s*$')
 
@@ -63,6 +69,54 @@ def strip_comments(text):
         out.append(c)
         i += 1
     return "".join(out)
+
+
+def raise_top_threshold():
+    """Stop non-EEA regions being truncated to the first five engines.
+
+    GetPrepopulatedEngines() takes .first(kTopSearchEnginesThreshold) for the
+    kTopFive list type, which every non-EEA country gets. Appending engines to
+    a region therefore does nothing visible: the data is correct, compiled in,
+    and sliced off before it reaches the settings screen. This was only found
+    by tracing the consumer -- the build, the generated header and the shipped
+    libchrome.so all contained the new engines.
+
+    EEA countries are unaffected: they use the shuffled list, which is complete.
+    """
+    if not THRESHOLD.exists():
+        print("missing: " + str(THRESHOLD), file=sys.stderr)
+        return False
+    text = THRESHOLD.read_text(encoding="utf-8")
+    m = re.search(r"(constexpr size_t kTopSearchEnginesThreshold = )(\d+)(;)", text)
+    if not m:
+        print("kTopSearchEnginesThreshold not found", file=sys.stderr)
+        return False
+    if int(m.group(2)) >= WANT_VISIBLE:
+        return True
+    updated = text[:m.start()] + m.group(1) + str(WANT_VISIBLE) + m.group(3) + text[m.end():]
+    assert updated != text, "threshold unchanged"
+    THRESHOLD.write_text(updated, encoding="utf-8", newline=chr(10))
+    print("raised kTopSearchEnginesThreshold " + m.group(2) + " -> " + str(WANT_VISIBLE))
+    return True
+
+
+def bump_data_version():
+    """Raise kCurrentDataVersion so existing profiles re-merge the engine list."""
+    if not ENGINES.exists():
+        print("missing: " + str(ENGINES), file=sys.stderr)
+        return False
+    text = ENGINES.read_text(encoding="utf-8")
+    m = re.search(r'("kCurrentDataVersion":\s*)(\d+)', text)
+    if not m:
+        print("kCurrentDataVersion not found", file=sys.stderr)
+        return False
+    old = int(m.group(2))
+    new = old + 1
+    updated = text[:m.start()] + m.group(1) + str(new) + text[m.end():]
+    assert updated != text, "version unchanged"
+    ENGINES.write_text(updated, encoding="utf-8", newline=chr(10))
+    print("bumped kCurrentDataVersion " + str(old) + " -> " + str(new))
+    return True
 
 
 def main() -> int:
@@ -160,6 +214,17 @@ def main() -> int:
     if regions_touched == 0:
         print("already applied: all regions offer " + ", ".join(ADD))
         return 0
+
+    # A profile that already exists keeps the engine list it was created with.
+    # The merge only re-runs when the stored prepopulate version is lower than
+    # kCurrentDataVersion, so without a bump this patch is invisible to every
+    # existing install -- which is exactly what the first on-device test showed:
+    # the build had the data and the settings screen still listed the old five.
+    if not raise_top_threshold():
+        return 1
+
+    if not bump_data_version():
+        return 1
 
     TARGET.write_text(text, encoding="utf-8", newline=chr(10))
     print("added " + ", ".join(ADD) + " to " + str(regions_touched) + " regions "
