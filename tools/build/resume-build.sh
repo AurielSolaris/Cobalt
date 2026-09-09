@@ -17,7 +17,7 @@
 #     problem and are not one.
 
 # Resolve sibling tools relative to this script, not an absolute path.
-TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TOOLS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 set -euo pipefail
 

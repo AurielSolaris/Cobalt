@@ -3,6 +3,11 @@
 # the 16-job build thrashed at 4 objects/min for hours and looked merely slow.
 OUT=/opt/cobalt/chromium/m140/src/out/Default
 SRCROOT=/opt/cobalt/chromium/m140/src
+# Reference point for "newer than this build". This must be a FIXED instant,
+# not the live log: the log keeps being written after the APK is linked, so
+# comparing against it means the APK is never "newer" and completion never
+# fires. The stamp is created once, at build start, and never touched again.
+LOGREF=${LOGREF:-/opt/cobalt/build.start}
 APK=$OUT/apks/ChromePublic.apk
 INTERVAL="${INTERVAL:-300}"
 prev=-1
@@ -19,7 +24,12 @@ while true; do
   # "|| echo 0" fallback appends a second zero, the value becomes two lines,
   # and every numeric test rejects it. Same trap as "grep -c ... || echo 0"
   # corrupting the patch-classification columns earlier in this project.
-  clang=$(pgrep -fc clang 2>/dev/null)
+  # -f matches the whole command line, so each ccache wrapper counts as a
+  # clang and the number comes out at exactly double. Count the compiler by
+  # its process name instead. Note "pgrep -x clang++" does NOT work: the
+  # pattern is a regex, so "g++" is a quantifier error, and it silently
+  # matches nothing.
+  clang=$(ps -eo comm= | grep -cx 'clang++' 2>/dev/null)
   clang=${clang:-0}
 
   # The volume remounts read-only when the USB SSD throws write errors -- twice
@@ -43,7 +53,10 @@ while true; do
     echo "DISK LOW: ${freeg}GB free on the build filesystem -- stop before it fills"
   fi
 
-  if [ -f "$APK" ]; then
+  # An APK older than this build is the PREVIOUS build's artifact. Reporting it
+  # as completion is the fourth false-success this project has produced, so the
+  # check is "newer than the log we are watching", not "exists".
+  if [ -f "$APK" ] && [ "$APK" -nt "$LOGREF" ]; then
     echo "BUILD COMPLETE: ChromePublic.apk $(du -h "$APK" | cut -f1), $n objects"
     exit 0
   fi

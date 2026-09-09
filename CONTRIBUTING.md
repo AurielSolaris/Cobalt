@@ -75,6 +75,12 @@ renders something rather than an error screen.
 ## Code
 
 - Kotlin official style; the Gradle build enforces it.
+- **New code is Kotlin. Existing Java is left alone.** Cobalt's own shell is
+  Kotlin and Compose, and anything we write is too. Chromium's Android layer is
+  Java and stays Java — converting it is not a goal and is actively harmful,
+  because every converted file becomes a permanent merge conflict against
+  upstream and has to be re-resolved at every rebase. Touch a Java file only when
+  a change genuinely requires it, and then keep it Java and keep the diff small.
 - Shared code lives in `commonMain` and must not reach for JVM APIs. Platform
   behaviour goes behind an interface implemented in `androidMain`, not an `expect`
   declaration — the `linuxX64` and `mingwX64` targets exist to catch exactly this.
