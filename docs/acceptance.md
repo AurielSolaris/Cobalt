@@ -35,6 +35,13 @@ The port's first real proof point.
 - [ ] **No deprecation warning appears anywhere.** `MV2ExperimentStage` is
       `kNone`; if a warning shows, a flag is wrong.
 - [ ] An MV3 extension also installs and runs. Both, not either.
+- [ ] **`web_accessible_resources` is enforced.** A page NOT listed in an
+      extension's `web_accessible_resources` must fail to load a resource from
+      it. This is checked because batch 1 shipped a patch that compiled the
+      enforcing call out entirely, and two green builds did not reveal it —
+      see [decision 0011](decisions/0011-refuse-mechanical-disablers.md).
+- [ ] A component extension's bundled resources load. The same patch gated them
+      behind a directory name from a component extension deleted years ago.
 
 **The thing MV2 exists for**
 - [ ] uBlock Origin installs and loads.
