@@ -55,23 +55,81 @@ Size went 303 MB → 317 MB against Gate A; the delta is the subsystem.
 - [x] Launches; process stays alive; 3 processes (browser + renderer + GPU).
 - [x] No `FATAL` or `AndroidRuntime` crash in logcat.
 
-## Not verified — device is PIN-locked
+## Extension platform — verified on device
 
-`mDreamingLockscreen=true`. Screenshots return the lock screen, so nothing
-visual could be confirmed and no UI could be driven. Not attempted.
+Device unlocked; all of the following was driven on RZ8R81K1NBP.
 
-Outstanding, all needing an unlocked device:
+### The management surface exists
 
-- [ ] `chrome://extensions` renders. One navigation attempt returned a blank
-      page, but the device was locked at the time, so **this is not evidence of
-      a fault** — it needs redoing before it means anything.
-- [ ] An MV2 extension installs from a `.crx` and survives a restart.
-- [ ] No MV2 deprecation warning appears.
-- [ ] An MV3 extension installs and runs.
-- [ ] A `webRequestBlocking` listener fires and actually blocks a request.
-- [ ] `web_accessible_resources` is enforced (see [decision 0011](decisions/0011-refuse-mechanical-disablers.md)).
-- [ ] Component extension bundled resources load.
-- [ ] Gate A's pinch-zoom check, still NOT RUN from Gate A.
+- [x] `chrome://extensions` renders the **full desktop WebUI** on a phone.
+- [x] Developer mode toggles, revealing **Load unpacked / Pack extension / Update**.
+- [x] `Load unpacked` opens the Android SAF directory picker and loads from it.
+- [x] `chrome://version` reports `Cobalt 140.0.7339.264` and `Desktop Android: true`.
+
+### MV2 — the platform the project exists to keep
+
+- [x] MV2 extension loads, enables, and runs a **persistent background page**.
+- [x] **No deprecation warning anywhere.**
+- [x] Survives a full `force-stop` + relaunch, **still enabled** — not auto-disabled.
+- [x] Disabled state also survives a restart, so the pref is genuinely persisted
+      rather than defaulted.
+- [x] **`webRequestBlocking` actually blocks**: navigating to a blocked host gives
+      `ERR_BLOCKED_BY_CLIENT`, "This page has been blocked by an extension".
+- [x] **Control test**: with the extension disabled the same URL loads normally,
+      so the block is attributable to the extension and not to anything else.
+
+### The uBlock Origin API surface
+
+uBO needs more than a blocking listener, so a probe exercising its actual
+dependencies was run. All nine checks pass:
+
+| check | result |
+|---|---|
+| `manifest_version` | 2 |
+| `getBackgroundPage` | reachable — MV2-only API, absent in MV3 |
+| `bg_messaging` | pong |
+| `tabs_query` | works |
+| **`block_subresource`** | **cancelled** — blocking works on subresources, not just navigations |
+| **`onHeadersReceived`** | **fires in blocking mode** — uBO's CSP-injection path |
+| `storage_6MB` | 6,291,456 bytes — `unlimitedStorage` honoured |
+| `storage_roundtrip` | persisted |
+| `control_fetch` | not blocked |
+
+Content script, injected at `document_start` in all frames — how uBO hides
+elements before paint:
+
+```
+cs_ran_at=loading       → document_start injection confirmed
+war_allowed=OK_loaded   → listed resource loads from a page context
+war_secret=blocked_OK   → unlisted resource is REFUSED
+```
+
+That last line is [decision 0011](decisions/0011-refuse-mechanical-disablers.md)'s
+check passing. Had Kiwi's `#if 0` around `AllowExtensionResourceLoad` shipped, it
+would read `LEAKED_FAIL`.
+
+**One MV2 rule was enforced against us, correctly.** The probe was first written
+with `"persistent": false` and Chromium refused it: *"The 'webRequest' API cannot
+be used with event pages."* uBO sets `"persistent": true` for exactly this
+reason. A build with a half-wired MV2 would have accepted the manifest and then
+silently failed to block.
+
+### MV3 — alongside, not instead
+
+- [x] MV3 extension loads and runs a **service worker**.
+- [x] **Three extensions run simultaneously**: 2 × MV2 with background pages and
+      1 × MV3 with a service worker. Gate B's "both, not either" is satisfied.
+
+## Still outstanding
+
+- [ ] **Real uBlock Origin**, as opposed to a probe shaped like it. The probe
+      covers the API surface; it does not prove uBO's own code runs.
+- [ ] **uBO as a bundled system extension** — Stage 8. Everything above was
+      side-loaded unpacked through SAF, which is a *different install path* from
+      a preinstalled recommended-mode extension. Disable-but-not-uninstall is
+      therefore still completely untested; the Remove button was present on every
+      extension here, which is the correct behaviour for unpacked ones.
+- [ ] Pinch-zoom, still NOT RUN, carried over from Gate A.
 
 ## What it cost to get here
 
