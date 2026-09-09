@@ -86,3 +86,28 @@ it in two taps, which is why disable had to stay available and why
 - `LICENSES/` gains uBO's GPLv3 text and attribution.
 - If uBO ever ships an MV3 build, none of this changes — MV2 stays supported per
   [0005](0005-support-mv2-and-mv3.md).
+
+## Implementation status (added after building it)
+
+Accepted and **implemented**; see [`ublock-bundling.md`](../ublock-bundling.md)
+for the full record.
+
+Two things the decision got right, confirmed by building it:
+
+- **Recommended mode is configuration, not a patch.** `normal_installed` gives
+  exactly `MustRemainInstalled && !MustRemainEnabled`, as predicted. The only
+  Cobalt code involved is a policy provider to deliver the value, because
+  `extensions.management` is loaded with `force_managed=true` and so cannot be
+  a user pref.
+- **The MV2-store worry was the right worry, for the wrong reason.** Bundling
+  is indeed the only reliable delivery path — but the obstacle turned out to be
+  Android, not the Web Store. Two of uBO's permissions (`webNavigation`,
+  `unlimitedStorage`) are switched off for `desktop_android` upstream, and MV2's
+  `browserAction` schema was not built at all. The first was fatal to the
+  renderer and is fixed; `webNavigation` remains open.
+
+One thing it did not anticipate: `normal_installed` requires a valid
+`update_url`, so the "no update mechanism" question could not be deferred
+entirely. A Cobalt-owned placeholder satisfies the parser and nothing fetches
+it, but the self-hosted endpoint is now a named future dependency rather than
+an option.
