@@ -33,3 +33,7 @@ keystore.properties
 .idea/
 *.iml
 .DS_Store
+
+# Python bytecode from running the patch and asset tools
+__pycache__/
+*.pyc
