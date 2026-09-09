@@ -93,7 +93,14 @@ solving identification is a strategy that quietly ships known-vulnerable code
 while believing otherwise.
 
 That risk is why this decision includes a sourcing method rather than an
-intention.
+intention — and why it has since been given a decision of its own.
+**[0017](0017-corroborate-security-fixes-across-forks.md) refines this section**:
+security fixes are identified by corroborating across independent Chromium forks
+on top of the upstream record below, because every fork carrying an out-of-tree
+patch set faces this same problem and several have been solving it for years.
+Cromite already assembles its series from Iridium, Inox, Brave,
+ungoogled-chromium and GrapheneOS, so the method is established practice in
+Cobalt's exact niche rather than an experiment.
 
 ### Sourcing, in priority order
 
@@ -107,6 +114,12 @@ intention.
 3. **The public issue tracker, once bugs open.** Visibility is granted in
    batches after the fact; a periodic sweep catches what was invisible when the
    release shipped.
+3. **chromiumdash** — `fetch_milestones` gives each milestone's Chromium branch,
+   its per-component branches for V8, Skia, ANGLE and WebRTC, and a
+   `schedule_phase` including `"extended"`. It is how to find which branch
+   carries a fix, and it is the reminder that Chrome backports security fixes to
+   every other milestone branch for extended stable — a stream closer to M140
+   than trunk is.
 4. **DEPS'd third parties directly** — V8, BoringSSL, ANGLE, Skia, libwebp,
    FreeType publish their own advisories, and a meaningful share of Chromium
    CVEs originate there. These are pinned by M140's DEPS and must be tracked as
