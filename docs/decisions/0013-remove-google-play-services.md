@@ -56,6 +56,30 @@ Safe Browsing is the one worth stating explicitly, because "remove Google" and
 "remove GMS" are different goals and conflating them would cost real user
 protection for no packaging benefit.
 
+## The telemetry string is left alone, deliberately
+
+The first-run screen currently reads:
+
+> the app, Cobalt sends usage and crash data to Google
+
+After the string rebrand that sentence is **false**, which is worse than it was
+when it said Chrome. It stays anyway, for now.
+
+Removing it is not a string edit. The sentence describes real behaviour —
+metrics and crash reporting wired to Google endpoints — and deleting the notice
+while the behaviour remains would turn a wrong disclosure into a missing one.
+The text goes when the reporting goes, and both happen as part of this decision's
+work rather than ahead of it.
+
+**Cobalt will eventually have basic telemetry of its own.** It is for the
+maintainer's own reference, it reports to Cobalt's own endpoint and never to
+Google, and it is a long way out — well after the removal here. It is recorded
+now only so that "remove GMS" is not later misread as "Cobalt must never have
+any telemetry".
+
+Do not delete the notice as a branding fix. It is accurate about *something*
+happening, and until the endpoints change, that is the more useful failure.
+
 ## Consequences
 
 - **Web Push is the hard one.** It is a genuine web platform feature, and without
