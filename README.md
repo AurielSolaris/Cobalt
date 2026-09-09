@@ -62,6 +62,32 @@ In progress: porting the rest of Kiwi's patch set. Two of its patches have been
 
 ---
 
+## Which Chromium, and what that means for security
+
+Cobalt is built on **Chromium 140**, and stays there on purpose. Chrome ships a
+milestone every two weeks; chasing that with a patch set this size would mean
+around 26 rebases a year and no capacity left for the browser itself. That is
+the treadmill Kiwi lost to.
+
+Instead Cobalt **pins 140 and backports security fixes from current stable**,
+rebasing only when a concrete trigger fires — a fix that cannot be backported, a
+platform capability that cannot be, or a hard 12-month ceiling on any one base.
+This is how Android ships a Linux kernel: years behind mainline, continuously
+patched, rebased at platform transitions rather than at mainline's pace. *Old*
+and *unpatched* are different properties, and only the second one matters.
+
+Two things follow, and Cobalt commits to both:
+
+- **The user agent tells the truth.** It reports Chromium 140, because that is
+  what Cobalt is built from. It will never claim a version it is not running.
+- **Applied backports are published** — which CVEs, which upstream commits,
+  which release. "We backport aggressively" is worth nothing if you cannot check
+  it.
+
+The full reasoning, including the part of the Android analogy that does **not**
+carry — Chromium publishes no LTS branch, so the curation is ours to do — is in
+[decision 0016](docs/decisions/0016-pin-chromium-140-and-backport.md).
+
 ## Building it yourself
 
 Everything Cobalt changes about Chromium is declared in

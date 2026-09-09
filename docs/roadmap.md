@@ -99,10 +99,17 @@ hand-tuned renderer does not.
 **Stage 5 is the hard one.** Kiwi sits on Chromium 105 (August 2022); current stable
 is 152. That four-year lag is the actual reason it needs reviving.
 
-It is done in two hops — M105 to M140, then M140 to current — rather than one leap.
-M140 is three years on from Kiwi's base to within days, and it leaves a
-12-milestone remainder instead of a 47-milestone one. A single jump would land
+It is done as one hop, M105 to M140, rather than one leap to current. M140 is
+three years on from Kiwi's base to within days. A single jump to 152 would land
 every conflict at once with no checkpoint and no way to tell progress from thrash.
+
+**The planned second hop, M140 to current, is cancelled.** Chrome now ships a
+milestone every two weeks, so tracking stable would mean roughly 26 rebases a
+year against this patch set — which is not a schedule, it is the whole schedule,
+and it is exactly what killed Kiwi. Cobalt instead pins M140 and backports
+security fixes aggressively, rebasing only when a defined trigger fires. This is
+the model Android uses for the Linux kernel, and the reasoning is in
+[decision 0016](decisions/0016-pin-chromium-140-and-backport.md).
 
 Kiwi's source is a whole-file **overlay**, not a patch series: it says which files
 were touched, never what changed inside them. Recovering real diffs — by checking

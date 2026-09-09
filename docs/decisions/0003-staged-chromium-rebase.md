@@ -1,7 +1,14 @@
 # 0003 — Rebase to Chromium 140 first, not to current stable
 
-**Status:** accepted
+**Status:** accepted; amended by [0016](0016-pin-chromium-140-and-backport.md)
 **Date:** 2026-09-07
+
+> **Amended 2026-09-10.** The choice of M140 stands and was correct. The
+> planned second hop to current stable -- Stage 5b -- is **cancelled**. This
+> decision already flagged that Chrome's two-week cadence broke the intended
+> rebase interval and deferred the fix to Stage 10; that revisit is
+> [0016](0016-pin-chromium-140-and-backport.md), which pins M140 and backports
+> security fixes instead of tracking stable.
 
 ## Context
 

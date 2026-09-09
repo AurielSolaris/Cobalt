@@ -51,10 +51,19 @@ paths will be removed outright, and from that release onward keeping MV2 means
 carrying restored code ourselves — a permanent, growing delta of exactly the
 kind this project is trying to escape.
 
-This is a real argument for **not** rebasing past that point casually. When
-Stage 5b picks a target newer than M140, the first thing to measure is whether
-MV2 is still present or has become a restoration job. That measurement gates the
-choice of target; it is not a detail to discover afterwards.
+This is a real argument for **not** rebasing past that point casually.
+
+> **Updated 2026-09-10.** Stage 5b is cancelled and Cobalt pins M140
+> ([0016](0016-pin-chromium-140-and-backport.md)). That decision was taken for
+> sustainability reasons, but it protects MV2 as a side effect: staying on a base
+> that still contains the MV2 code paths means keeping them for free, rather than
+> carrying a restoration delta that grows with every milestone.
+>
+> This makes MV2 a **rebase trigger criterion in its own right**. Whenever 0016's
+> triggers force a move off M140, the first thing to measure is whether MV2 is
+> still present at the candidate target or has become a restoration job — and
+> that measurement gates the choice of target, not something to discover
+> afterwards.
 
 ## Consequences
 
@@ -63,7 +72,7 @@ choice of target; it is not a detail to discover afterwards.
 - Stage 8 needs the extension installer to accept both, and the UI to show which
   version an extension uses — the user should be able to see why one blocker
   works better than another.
-- Stage 5b's target selection is now partly an MV2 question. See
-  [0003](0003-staged-chromium-rebase.md).
+- Any future rebase target selection is partly an MV2 question. See
+  [0016](0016-pin-chromium-140-and-backport.md).
 - MV2 being retained is a user-visible feature and belongs in the README, not
   buried in a flag.
