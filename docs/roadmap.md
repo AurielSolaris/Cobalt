@@ -39,23 +39,46 @@ took configuration rather than a port. See
 [`gate-b-results.md`](gate-b-results.md) and
 [decision 0010](decisions/0010-desktop-android-extensions.md).
 
-What that does **not** mean is that Stage 8 is finished. Bundling uBlock Origin
-as a preinstalled, disableable, non-uninstallable extension is still open, and
-the side-loading route has a real defect: extensions declaring `default_locale`
-fail to load through the Android file picker, which is most real extensions. See
-[`extension-loading-android.md`](extension-loading-android.md).
+**uBlock Origin now ships preinstalled and works** — installed from the APK on
+first run, 176,450 filters compiled, blocking verified on device, and
+disableable but not uninstallable. That closes release gate 1. See
+[`ublock-bundling.md`](ublock-bundling.md).
+
+Getting there closed two upstream gaps that were not on this map: MV2's
+`browserAction` schema was not built for Android at all, and `webNavigation` was
+excluded from `desktop_android`. The `_locales` side-loading defect was traced
+to `base::FileEnumerator` never handling SAF virtual document paths, and fixed —
+see [`extension-loading-android.md`](extension-loading-android.md), though it
+still needs re-testing through the picker.
 
 Two items have since been added ahead of 1.0 that were not on this map, both
 because they are release gates rather than features:
 
-- **Cobalt's own password store**, because Chromium's Android password manager
-  is disabled outright without a closed-source backend
-  ([decision 0012](decisions/0012-own-password-store.md)).
 - **Removing Google Play Services entirely**
-  ([decision 0013](decisions/0013-remove-google-play-services.md)).
+  ([decision 0013](decisions/0013-remove-google-play-services.md)), which comes
+  **before** the shell — the reasoning, and the measurement behind it, is in
+  [decision 0014](decisions/0014-gms-removal-before-shell.md).
+- **Passwords**, because Chromium's Android password manager is disabled
+  outright without a closed-source backend
+  ([decision 0012](decisions/0012-own-password-store.md)). Cobalt enables
+  Chromium's own local store with CSV import/export, and makes system autofill a
+  first-class choice, rather than writing any credential code
+  ([decision 0015](decisions/0015-passwords-local-store-and-system-autofill.md)).
 
 Neither `stable` nor a 1.0 happens while those are open; see
 [`branching.md`](branching.md) for the three gates on the first promotion.
+
+## Next
+
+1. **`unlimitedStorage` on `desktop_android`** — excluded upstream the same way
+   `webNavigation` was. uBO declares it and runs without it, but its storage
+   falls under the ordinary quota.
+2. **Passwords** — starting with the spike in
+   [decision 0015](decisions/0015-passwords-local-store-and-system-autofill.md):
+   turn `use_login_database_as_backend` on and measure what the settings surface
+   actually does.
+3. **The rest of GMS removal**, in the order set out in
+   [decision 0014](decisions/0014-gms-removal-before-shell.md).
 
 ## The target device
 

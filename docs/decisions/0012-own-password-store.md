@@ -1,7 +1,13 @@
 # 0012 — Ship our own password store, with no Google Play Services
 
-**Status:** accepted
+**Status:** accepted; framing superseded by [0015](0015-passwords-local-store-and-system-autofill.md)
 **Date:** 2026-09-09
+
+> **Note added 2026-09-10.** The finding below stands: without GMS, Cobalt has
+> no password manager at all. The proposed answer -- "ship our own store" --
+> turned out to overstate the work. Chromium's store is complete and disabled
+> on Android by a single GN argument, and the third-party autofill path is
+> already plumbed. See [0015](0015-passwords-local-store-and-system-autofill.md).
 
 ## Context
 
