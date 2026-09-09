@@ -26,6 +26,37 @@ experiment that may never run.
 | 11 | Stabilization | 1.0.0 | Ship it |
 | 12 | JavaScriptCore | post-1.0 | Flag-gated experiment; may be abandoned |
 
+## Where Cobalt actually is
+
+The stage numbers are a plan, not a report, and the plan has already been
+overtaken in one place worth recording.
+
+**Stage 8 arrived during Stage 5.** Extensions were expected to be the last
+hard thing before release engineering. They work now — MV2 and MV3, on device,
+with `webRequestBlocking` genuinely blocking — because upstream already builds
+the extension system for Android behind `is_desktop_android`, so switching it on
+took configuration rather than a port. See
+[`gate-b-results.md`](gate-b-results.md) and
+[decision 0010](decisions/0010-desktop-android-extensions.md).
+
+What that does **not** mean is that Stage 8 is finished. Bundling uBlock Origin
+as a preinstalled, disableable, non-uninstallable extension is still open, and
+the side-loading route has a real defect: extensions declaring `default_locale`
+fail to load through the Android file picker, which is most real extensions. See
+[`extension-loading-android.md`](extension-loading-android.md).
+
+Two items have since been added ahead of 1.0 that were not on this map, both
+because they are release gates rather than features:
+
+- **Cobalt's own password store**, because Chromium's Android password manager
+  is disabled outright without a closed-source backend
+  ([decision 0012](decisions/0012-own-password-store.md)).
+- **Removing Google Play Services entirely**
+  ([decision 0013](decisions/0013-remove-google-play-services.md)).
+
+Neither `stable` nor a 1.0 happens while those are open; see
+[`branching.md`](branching.md) for the three gates on the first promotion.
+
 ## The target device
 
 **4 GB of RAM and 2 CPU cores.** Not a floor Cobalt tolerates — the machine it is
