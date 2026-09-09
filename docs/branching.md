@@ -11,9 +11,11 @@ running alongside `nightly` today, and the docs should not imply that it is.
 Three things gate the first promotion, and they are product requirements rather
 than a quality bar to be argued down:
 
-1. **uBlock Origin works** as a bundled extension — installed, blocking, and
-   disableable but not uninstallable. See
-   [decision 0006](decisions/0006-bundle-ublock-origin.md).
+1. ~~**uBlock Origin works** as a bundled extension~~ — **MET.** Installed from
+   the APK on first run, 176,450 filters compiled, blocking verified on device
+   (`ERR_BLOCKED_BY_CLIENT`), and disableable but not uninstallable. See
+   [decision 0006](decisions/0006-bundle-ublock-origin.md) and
+   [`ublock-bundling.md`](ublock-bundling.md).
 2. **Google Play Services is gone.** No GMS dependency anywhere in the build,
    including the password path, which today is disabled outright without it. See
    [decision 0012](decisions/0012-own-password-store.md).

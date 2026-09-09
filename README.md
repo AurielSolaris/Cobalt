@@ -47,10 +47,48 @@ already build the extension system for Android behind `is_desktop_android`
 ([decision 0010](docs/decisions/0010-desktop-android-extensions.md)) — no patch
 of ours was needed to switch it on.
 
-In progress: bundling uBlock Origin as a preinstalled extension, and porting the
-rest of Kiwi's patch set. Two of its patches have been **refused** rather than
-ported, one of which had disabled a security check
+**uBlock Origin ships preinstalled, and works.** It rides in the APK as a signed
+CRX, installs itself on first run, compiles 176,450 network filters, and blocks
+requests on device — `static.doubleclick.net` returns `ERR_BLOCKED_BY_CLIENT`.
+It **cannot be uninstalled but can be disabled**, which is the semantic
+[decision 0006](docs/decisions/0006-bundle-ublock-origin.md) asked for. Getting
+there needed two upstream gaps closed: MV2's `browserAction` schema was not built
+for Android at all, and `webNavigation` was excluded from `desktop_android`. Both
+are now ported. See [`docs/ublock-bundling.md`](docs/ublock-bundling.md).
+
+In progress: porting the rest of Kiwi's patch set. Two of its patches have been
+**refused** rather than ported, one of which had disabled a security check
 ([decision 0011](docs/decisions/0011-refuse-mechanical-disablers.md)).
+
+---
+
+## Building it yourself
+
+Everything Cobalt changes about Chromium is declared in
+`tools/patches/series.txt`, and one command applies it:
+
+```sh
+tools/build/build-chromium.sh all      # hooks + patch + gen + build
+```
+
+Full instructions, host requirements and the ccache setup are in
+[`docs/reproducible-build.md`](docs/reproducible-build.md).
+
+### What you get today, and what you don't
+
+Building from `nightly` right now gives you **Chromium 140 with Cobalt's engine
+work**: extensions on Android, MV2 and MV3, uBlock Origin preinstalled and
+blocking, the extra search engines, and Cobalt's name and icons throughout.
+
+**You do not get Cobalt's own shell.** The UI is still Chromium's Android
+front-end wearing Cobalt's branding — its toolbar, its tab switcher, its
+settings. The Kotlin/Compose shell with the bottom bar
+([decision 0002](docs/decisions/0002-shell-design.md)) is not wired to the engine
+yet; `./gradlew` builds it as a standalone 0.1.0 chassis that does not embed
+Chromium. Replacing the Chromium shell is one of the three gates before a
+`stable` release, along with uBlock Origin (**done**) and removing Google Play
+Services ([decision 0013](docs/decisions/0013-remove-google-play-services.md),
+not started). See [`docs/branching.md`](docs/branching.md).
 
 ---
 

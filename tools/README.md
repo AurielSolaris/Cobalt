@@ -72,6 +72,7 @@ and an `fsck` aimed at yesterday's letter once pointed at the distro root.
 | `cobalt-chromesearch-scheme.py` | Port Kiwi's chrome-search URL pattern to M140, where the constant moved up a layer |
 | `cobalt-search-engines.py` | Offer Ecosia, Kagi and Qwant in every region |
 | `cobalt-mv2-action-schemas.py` | Ship the MV2 browserAction/pageAction schemas on Android; without them the renderer aborts |
+| `cobalt-webnavigation-android.py` | Port webNavigation to desktop_android; the tab-strip half stays desktop-only |
 | `cobalt-saf-file-enumerator.py` | Let `base::FileEnumerator` list `/SAF/` paths, so localised extensions can side-load |
 | `cobalt-bundle-ublock.py` | Stage the uBO CRX into the APK, install it, and make it disableable-but-not-removable |
 

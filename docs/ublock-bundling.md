@@ -1,8 +1,8 @@
 # Bundling uBlock Origin
 
-Release gate 1 of 3. Where it stands: **uBO ships in the APK, installs itself on
-first run, and loads. It does not yet run**, because two of the permissions it
-declares are switched off for Android upstream.
+Release gate 1 of 3. Where it stands: **done and verified on device.** uBO ships
+in the APK, installs itself on first run, loads its filter lists, blocks
+requests, and cannot be uninstalled but can be disabled.
 
 Decision: [0006](decisions/0006-bundle-ublock-origin.md).
 Applied by `tools/patches/cobalt-bundle-ublock.py`, in the series.
@@ -57,9 +57,11 @@ feature rather than something Cobalt carries.
 The pref behind it (`extensions.management`) is loaded with
 `force_managed=true`, so it cannot be set as a user pref — it has to arrive
 through a policy provider. `CobaltBundledExtensionPolicyProvider` supplies it,
-**appended last** in `CreatePolicyProviders`, which is the lowest priority: a
-real administrator's `ExtensionSettings` replaces Cobalt's rather than merging
-with it.
+owned by `ProfilePolicyConnector` and pushed **last** onto that profile's
+provider list, which is the lowest priority: a real administrator's
+`ExtensionSettings` replaces Cobalt's rather than merging with it. Getting this
+onto the *profile's* policy service rather than the browser's took a second
+attempt; see below.
 
 #### The update URL, and why nothing fetches it
 
@@ -124,9 +126,9 @@ first-class manifest version. Fixed by
 files into the unconditional list. No generated C++, and the browser-side
 `extension_action_dispatcher.cc` was already compiled unconditionally.
 
-### Open: webNavigation is off for desktop_android
+### Fixed: webNavigation was off for desktop_android
 
-With the renderer surviving, uBO now fails at its own bootstrap:
+With the renderer surviving, uBO then failed at its own bootstrap:
 
 ```
 I chromium: [INFO:CONSOLE:43] "Uncaught TypeError: Cannot read properties of
@@ -135,51 +137,72 @@ I chromium: [INFO:CONSOLE:43] "Uncaught TypeError: Cannot read properties of
 ```
 
 `js/webext.js:118` is `promisify(chrome.webNavigation, 'getFrame')`, and
-`chrome.webNavigation` is undefined. `_permission_features.json` says why, in
-as many words:
+`_permission_features.json` excluded the API from `desktop_android` in as many
+words.
 
-```jsonc
-"webNavigation": {
-  "channel": "stable",
-  "extension_types": ["extension", "legacy_packaged_app"],
-  // "desktop_android" is not supported.
-  "platforms": ["chromeos", "linux", "mac", "win"]
-},
-```
+The API is two classes with very different dependencies.
+`WebNavigationTabObserver` is a `WebContentsObserver` and produces every event
+uBO consumes, plus `getFrame` and `getAllFrames`; nothing about it is
+desktop-specific. `WebNavigationEventRouter` is a `TabStripModelObserver`,
+serves exactly `onTabReplaced` and `onCreatedNavigationTarget`, and is the sole
+reason the target asserted `enable_extensions` and pulled
+`//chrome/browser/ui:browser_tab_strip`, `:browser_list` and `/browser_window`.
 
-Checking every permission uBO declares:
+`tools/patches/cobalt-webnavigation-android.py` compiles the API on Android and
+guards the tab-strip half with `#if !BUILDFLAG(IS_ANDROID)` — the same condition
+`extension_tab_util.h` already uses for `GetTabStripModel`, the helper the
+guarded code calls. Upstream had drawn this line; the target had just not been
+split along it.
 
-| Permission | Available on desktop_android |
+**What Android does not get:** `onTabReplaced` and `onCreatedNavigationTarget`.
+Both describe desktop tab-strip mechanics Cobalt's shell does not have yet, and
+neither is used by uBO. The guarded region is small and self-contained on
+purpose — it is where Cobalt's own tab model hooks in later.
+
+### Fixed: the policy was on the wrong PolicyService
+
+The first attempt registered `CobaltBundledExtensionPolicyProvider` in
+`ChromeBrowserPolicyConnector::CreatePolicyProviders`, which looks like the
+obvious place and is the wrong one. `ProfilePolicyConnector::Init` does not
+iterate the browser connector's providers — it picks specific named ones
+(`GetPlatformProvider`, `proxy_policy_provider`, `command_line_policy_provider`,
+plus the profile's own cloud provider). A provider appended to the browser list
+reaches `local_state` and nothing else, while `extensions.management` is a
+profile pref.
+
+The symptom was quiet and would have been easy to declare done: uBO installed
+and ran, and only `chrome://policy` ("No policies set") and a working **Remove**
+button on `chrome://extensions` gave it away. The provider is now owned by
+`ProfilePolicyConnector` and `Init`ed against the profile's schema registry,
+following `RestrictedMGSPolicyProvider`'s precedent exactly.
+
+## Verified on device
+
+Fresh profile, `pm clear`, first launch, on a real phone:
+
+| Check | Result |
 |---|---|
-| `alarms` | yes |
-| `contextMenus` | yes |
-| `privacy` | yes |
-| `storage` | yes |
-| `tabs` | yes |
-| **`unlimitedStorage`** | **no — excluded** |
-| **`webNavigation`** | **no — excluded** |
-| `webRequest` | yes |
-| `webRequestBlocking` | yes |
+| CRX in the APK | `4529818  Stored` — uncompressed, as `OpenApkAsset` requires |
+| Staged and read | `external_pref_loader.cc:293` reports the deployment file |
+| Installed and loaded | extension process runs with `--extension-process` |
+| Filter lists compiled | **176,450 network + 54,877 cosmetic filters** |
+| Lists auto-updated | EasyList 85,287/85,821, EasyPrivacy 55,781/56,529, uBlock filters 71,385/71,494, AdGuard Mobile 12,665/12,836 |
+| **Actually blocks** | `static.doubleclick.net` → **`ERR_BLOCKED_BY_CLIENT`**, "blocked by an extension" |
+| Cannot uninstall | no **Remove** button, and Safety Check no longer offers removal |
+| Can disable | the toggle works, and the Remove button stays absent while disabled |
 
-The important line is the last one: **`webRequest` and `webRequestBlocking` are
-not restricted**, so the blocking machinery uBO actually needs is present. What
-is missing is frame bookkeeping and a storage quota flag.
+The blocking result is the one that matters: it proves MV2 `webRequestBlocking`
+with a persistent background page works on Android, which is the reason Cobalt
+exists.
 
-`webNavigation` is not a one-line permission flip. Its implementation
-(`chrome/browser/extensions/api/web_navigation/BUILD.gn`) carries
-`assert(enable_extensions)` and depends on `//chrome/browser/ui:browser_tab_strip`
-and `//chrome/browser/ui:browser_list` — desktop tab-strip concepts. Porting it
-is the same class of work as Route A.
+## Still open
 
-`unlimitedStorage` is expected to be much cheaper, but has not been looked at
-yet.
-
-## Next
-
-1. Port `webNavigation` for desktop-android, or establish whether uBO can be run
-   without it.
-2. `unlimitedStorage`.
-3. Confirm on device that uBO shows as disableable but not removable — the
-   policy is wired and compiled, but the *user-visible* proof needs
-   `chrome://extensions` with the extension actually running.
-4. Refresh the bundled version as a release-checklist item (decision 0006).
+- **`unlimitedStorage`** is excluded from `desktop_android` the same way
+  `webNavigation` was. uBO declares it, and runs without it, but its storage is
+  then subject to the ordinary quota. Not yet looked at; expected to be much
+  cheaper than webNavigation.
+- **Refreshing the bundled version** is a release-checklist item
+  ([decision 0006](decisions/0006-bundle-ublock-origin.md)), not something to
+  notice later.
+- **The update endpoint** at `updates.cobalt.auriel` does not exist yet. Nothing
+  fetches it today, by design, but it is now a named future dependency.

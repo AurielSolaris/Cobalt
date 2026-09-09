@@ -47,6 +47,10 @@ tool patches/cobalt-mv2-defaults.py --src $SRC
 # extension with a browser_action -- uBlock Origin included.
 tool patches/cobalt-mv2-action-schemas.py $SRC
 
+# webNavigation, which upstream marks as not supported on desktop_android.
+# uBlock Origin cannot start without it. The tab-strip half stays desktop-only.
+tool patches/cobalt-webnavigation-android.py $SRC
+
 note ===== Search engines =====
 
 # WARNING: this one writes into third_party/search_engines_data/resources,

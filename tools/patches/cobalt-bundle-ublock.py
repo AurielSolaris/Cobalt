@@ -457,33 +457,114 @@ def patch_browser_main_android() -> str:
 
 
 def patch_policy_connector() -> str:
-    path = SRC / "chrome/browser/policy/chrome_browser_policy_connector.cc"
+    """Register the provider on the PROFILE's policy service, not the browser's.
+
+    ChromeBrowserPolicyConnector::CreatePolicyProviders looks like the obvious
+    place and is the wrong one. ProfilePolicyConnector::Init does not iterate
+    the browser connector's providers -- it picks specific named ones
+    (GetPlatformProvider, proxy_policy_provider, command_line_policy_provider,
+    plus the profile's own cloud provider). A provider appended to the browser
+    list therefore reaches local_state and nothing else, while
+    extensions.management is a profile pref.
+
+    Symptom when this was wrong: uBO installed and ran, chrome://policy said
+    "No policies set", and chrome://extensions offered a working Remove button.
+
+    RestrictedMGSPolicyProvider is the precedent being followed here: a locally
+    owned provider, Init'd against the profile's schema registry, pushed onto
+    policy_providers_, and Shutdown with the connector.
+    """
+    path = SRC / "chrome/browser/policy/profile_policy_connector.cc"
+    header = SRC / "chrome/browser/policy/profile_policy_connector.h"
     text = path.read_text(encoding="utf-8")
-    if "cobalt_bundled_extension_policy_provider.h" in text:
+    head = header.read_text(encoding="utf-8")
+
+    if "cobalt_bundled_extension_policy_provider" in text:
         return "already applied"
 
-    inc_old = '#include "chrome/browser/policy/chrome_browser_policy_connector.h"\n'
-    inc_new = (
-        '#include "chrome/browser/policy/chrome_browser_policy_connector.h"\n'
-        '\n'
-        '#include "chrome/browser/policy/cobalt_bundled_extension_policy_provider.h"\n'
-        '#include "extensions/buildflags/buildflags.h"\n'
-    )
-    add_old = """  local_test_provider_ =
-      LocalTestPolicyProvider::CreateIfAllowed(chrome::GetChannel());"""
+    # Chromium's include order: primary header, system headers, then project
+    # headers alphabetically. Slot in next to the sibling policy header rather
+    # than directly under the primary one, which would sit above the system
+    # includes.
+    inc_old = """#include "chrome/browser/policy/chrome_browser_policy_connector.h"
+"""
+    inc_new = """#include "chrome/browser/policy/chrome_browser_policy_connector.h"
+#include "chrome/browser/policy/cobalt_bundled_extension_policy_provider.h"
+"""
+    add_old = """  std::vector<std::unique_ptr<PolicyMigrator>> migrators;
+"""
     add_new = """#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
-  // Appended last, so it is the lowest-priority provider: an administrator's
-  // ExtensionSettings replaces Cobalt's rather than being merged with it.
-  providers.push_back(
-      std::make_unique<CobaltBundledExtensionPolicyProvider>());
-#endif
+  // Keeps Cobalt's bundled extensions installable-but-not-removable. Pushed
+  // last, so it is the lowest priority: an administrator's ExtensionSettings
+  // replaces it rather than merging with it.
+  cobalt_bundled_extension_policy_provider_ =
+      std::make_unique<CobaltBundledExtensionPolicyProvider>();
+  cobalt_bundled_extension_policy_provider_->Init(schema_registry);
+  policy_providers_.push_back(cobalt_bundled_extension_policy_provider_.get());
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 
-  local_test_provider_ =
-      LocalTestPolicyProvider::CreateIfAllowed(chrome::GetChannel());"""
-    if inc_old not in text or add_old not in text:
-        raise Failed(f"anchor not found in {path}")
+  std::vector<std::unique_ptr<PolicyMigrator>> migrators;
+"""
+    for name, anchor in (("include", inc_old), ("providers", add_old)):
+        if anchor not in text:
+            raise Failed(f"anchor not found in profile_policy_connector.cc: {name}")
+        if text.count(anchor) != 1:
+            raise Failed(
+                f"anchor ambiguous in profile_policy_connector.cc: {name} "
+                f"({text.count(anchor)})")
     text = text.replace(inc_old, inc_new, 1).replace(add_old, add_new, 1)
+
+    # BUILDFLAG(ENABLE_EXTENSIONS_CORE) needs its header; this file has none.
+    if '"extensions/buildflags/buildflags.h"' not in text:
+        flag_old = """#include "components/policy/core/common/policy_map.h"
+"""
+        flag_new = """#include "components/policy/core/common/policy_map.h"
+#include "extensions/buildflags/buildflags.h"
+"""
+        if flag_old not in text:
+            raise Failed("no buildflags anchor in profile_policy_connector.cc")
+        text = text.replace(flag_old, flag_new, 1)
+
+    # Shutdown, so ~ConfigurationPolicyProvider's DCHECK(!initialized_) holds.
+    shutdown_anchor = """void ProfilePolicyConnector::Shutdown() {
+"""
+    shutdown_body = """#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+  if (cobalt_bundled_extension_policy_provider_) {
+    cobalt_bundled_extension_policy_provider_->Shutdown();
+  }
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+"""
+    if shutdown_anchor not in text:
+        raise Failed("Shutdown() not found in profile_policy_connector.cc")
+    text = text.replace(shutdown_anchor, shutdown_anchor + shutdown_body, 1)
     path.write_text(text, encoding="utf-8")
+
+    # The owning member.
+    head_old = """  raw_ptr<const ConfigurationPolicyProvider> configuration_policy_provider_ =
+      nullptr;
+"""
+    head_new = """#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+  // Supplies the ExtensionSettings policy for Cobalt's bundled extensions.
+  std::unique_ptr<ConfigurationPolicyProvider>
+      cobalt_bundled_extension_policy_provider_;
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+
+  raw_ptr<const ConfigurationPolicyProvider> configuration_policy_provider_ =
+      nullptr;
+"""
+    if head_old not in head:
+        raise Failed("member anchor not found in profile_policy_connector.h")
+    head = head.replace(head_old, head_new, 1)
+    if '#include "extensions/buildflags/buildflags.h"' not in head:
+        hinc_old = """#include "components/policy/core/common/policy_service.h"
+"""
+        hinc_new = """#include "components/policy/core/common/policy_service.h"
+#include "extensions/buildflags/buildflags.h"
+"""
+        if hinc_old not in head:
+            raise Failed("no include anchor in profile_policy_connector.h")
+        head = head.replace(hinc_old, hinc_new, 1)
+    header.write_text(head, encoding="utf-8")
     return "patched"
 
 
@@ -550,7 +631,7 @@ STEPS = [
                    POLICY_CC)),
     ("chrome/common/chrome_paths.cc", patch_chrome_paths),
     ("chrome/browser/chrome_browser_main_android.cc", patch_browser_main_android),
-    ("chrome/browser/policy/chrome_browser_policy_connector.cc", patch_policy_connector),
+    ("chrome/browser/policy/profile_policy_connector.{h,cc}", patch_policy_connector),
     ("chrome/browser/BUILD.gn (shared sources)", patch_browser_build_gn),
     ("chrome/browser/BUILD.gn (android sources)", patch_browser_build_gn_android),
     ("chrome/android/BUILD.gn (assets)", patch_android_assets),
