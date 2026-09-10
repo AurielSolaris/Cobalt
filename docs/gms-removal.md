@@ -45,7 +45,7 @@ free. So the work is 13 modules, not 18.
 | | Then | Now |
 |---|---:|---:|
 | Modules | 18 | **14** |
-| First-party edges | 49 | **38** |
+| First-party edges | 49 | **36** |
 
 ## The method
 
@@ -103,8 +103,9 @@ and doing it first would mean building on a layer about to change underneath it.
 2. ~~`services/device/geolocation` — location, tasks, base, basement~~ **done**
 3. `components/media_router` — cast, cast_framework (0013: casting is dropped).
    **Bigger than it looks — see below.**
-4. `components/gcm_driver`, `components/signin`, `components/externalauth`,
-   `components/module_installer`, `components/webauthn`, `components/omnibox`
+4. ~~`components/externalauth`~~ **done**; `components/gcm_driver`,
+   `components/signin`, `components/module_installer`, `components/webauthn`,
+   `components/omnibox`
 5. `content/public/android` — auth_api_phone, base, basement, tasks
 6. `chrome/browser/*` — omaha, password_manager, webid, webauthn, language,
    ui/android/omnibox
@@ -287,3 +288,48 @@ And `//components/media_router/browser/android:java` is pulled by
 drop Cast types, or a removal that reaches into `chrome/android` — and the
 second is better done when `chrome/android` comes up in the order anyway,
 possibly alongside the shell that replaces much of it.
+
+## 5. `components/externalauth` — done
+
+Applied by `tools/patches/cobalt-gms-externalauth.py`. **Edges 38 → 36**, and
+worth more than that number suggests.
+
+`ExternalAuthUtils.canUseGooglePlayServices()` is *the* question the rest of the
+tree asks before doing anything GMS-shaped — **fourteen non-test call sites**.
+Answering `false` unconditionally makes every one of them take the path upstream
+already ships for a device without Play Services, *before* their own removals
+are written. The behaviour becomes the target behaviour and only the dependency
+is left, which makes everything after it safer.
+
+Five methods stop consulting GMS:
+
+| Method | Now |
+|---|---|
+| `canUseGooglePlayServices(errorHandler)` | `false` |
+| `canUseGooglePlayServices()` | `false` |
+| `canUseFirstPartyGooglePlayServices(...)` | `false` |
+| `isGooglePlayServicesMissing(context)` | `true` |
+| `checkGooglePlayServicesAvailable` / `isUserRecoverableError` / `describeError` | deleted |
+
+Those last three were `protected` hooks for subclasses, and they could not
+survive in any form: their signatures traffic in `ConnectionResult` codes and
+their bodies are `GoogleApiAvailability` calls, so they *are* the dependency.
+Nothing overrides them outside one test class.
+
+The `UserRecoverableErrorHandler` parameter stays. It exists to offer the user a
+way to repair a *recoverable* Play Services problem, and no such journey exists
+here — but keeping it avoids editing fourteen call sites to delete an argument
+none of them will miss.
+
+**Not touched, though it looks like it belongs:** `isGoogleSigned` and
+`isChromeGoogleSigned` go through `mGoogleDelegate`, which is null in upstream
+Chromium and exists as a downstream hook. No GMS, no change.
+
+**One behaviour worth stating:** `SigninManagerImpl` asks
+`isGooglePlayServicesMissing()` and now always hears `true`. That is correct and
+it is the point — sign-in is dropped by 0013, and on a Cobalt device the honest
+answer is yes.
+
+Five imports were left holding nothing once the hooks went, and Chromium's Java
+checks treat an unused import as an error, so they went too. `Log` stays;
+`isSystemBuild` still uses it.

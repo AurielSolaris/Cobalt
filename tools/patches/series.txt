@@ -105,6 +105,12 @@ tool patches/cobalt-gms-geolocation.py $SRC
 # need a dep it never imports. Edges 43 -> 38, no Java changes.
 tool patches/cobalt-gms-chrome-java-dead-deps.py $SRC
 
+# ExternalAuthUtils is the question the rest of the tree asks before doing
+# anything GMS-shaped -- 14 non-test call sites. Answering false unconditionally
+# makes all of them take upstream's own no-Play-Services path before their own
+# removals are written, which makes the rest of 0013 safer.
+tool patches/cobalt-gms-externalauth.py $SRC
+
 note ===== Bundled extensions =====
 
 # Stages the signed uBO CRX into the APK and configures the policy that makes
