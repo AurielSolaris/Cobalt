@@ -104,8 +104,48 @@ That is also better for every reason
 [`gms-removal.md`](gms-removal.md) already argues: the shell is Cobalt-owned code
 in Cobalt-owned files, and it never conflicts on rebase.
 
-**Unverified:** no `dist_aar` has been built for content yet, and the size and
-dependency closure are unknown. That is the next spike after the one below.
+### Verified: the AAR builds, and the seam is in the right place
+
+`tools/patches/cobalt-content-aar.py` adds `dist_aar("cobalt_content_dist_aar")`
+over exactly the embedding surface above — `content_full_java` plus
+`embedder_support:content_view_java`. It built in **21 seconds, 2 steps**, over
+Java that was already compiled.
+
+| | |
+|---|---:|
+| `cobalt_content.aar` | **55.3 MB** (58,031,439 bytes) |
+| files | 1,567 |
+| classes in `classes.jar` | **22,364** |
+| **`org/chromium/chrome/` classes** | **0** |
+
+That last row is the result that matters. **Nothing from `chrome/android` comes
+along** — no Chrome UI, no tab model, no toolbar. The closure is the content
+layer and its dependencies:
+
+```
+5489  org/chromium/blink      (mojom bindings, the bulk of it)
+2165  org/chromium/network
+1931  com/google/common
+1446  org/chromium/media
+1039  org/chromium/device
+ 509  org/chromium/ui
+ 433  org/chromium/content
+ 414  org/chromium/base
+```
+
+So the seam is cut in the right place: Cobalt gets the engine without inheriting
+Chrome's interface, which is the whole premise of gate 3.
+
+**55 MB of Java is not the shipped cost.** Most of those 5,489 blink mojom
+classes are unreachable from any given embedder and R8 in the consuming app
+shrinks accordingly — but that is an expectation, not a measurement, and it
+should be measured once the app actually links against it.
+
+**Java only, deliberately.** No native libraries and no assets: `libchrome.so`
+is 205 MB and the paks another 70 MB, and bundling them would have made every
+failure a twenty-minute failure while answering nothing about the question that
+was actually open. Adding them is mechanical — `cast_browser_dist_aar` sets
+`native_libraries` and an assets dep — and is the next step.
 
 ## Closed: Compose draws over the content surface
 
@@ -140,8 +180,14 @@ should behave identically.
 Everything above is a dependency-graph result. These are not, and each needs a
 spike of its own before anything is committed to:
 
-- **A content `dist_aar`.** Does it build, how large is it, and what does its
-  dependency closure drag in? This is now the riskiest open question.
+- **Native libraries and assets in the AAR.** The Java half is done (below);
+  `libchrome.so` is 205 MB and the pak/ICU assets another 70 MB, and how a
+  Gradle consumer handles those is untested. `cast_browser_dist_aar` shows the
+  mechanism.
+- **Browser process startup from a Gradle app.** `BrowserStartupController`
+  needs the native library loaded and the command line initialised, which
+  `ChromeBrowserInitializer` does in `chrome/android` — the layer Cobalt is not
+  taking. `content_shell` does it in about thirty lines; that is the model.
 - **What `chrome/browser` expects that only `chrome/android` provides.** The
   extension WebUI is clean, but other browser-layer code reaches into Java
   through interfaces Chrome's Android layer implements. This is the same
@@ -156,14 +202,18 @@ spike of its own before anything is committed to:
 ## Order this should go in
 
 1. ~~**Compose + SurfaceView spike.**~~ **Done** — Compose draws over it.
-2. **A content `dist_aar`**, consumed by `modules/app`. One hardcoded URL, no
-   tabs, no chrome.
-3. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch.
-4. **Bottom bar wired to it** — the four sections from 0002, with the address
+2. ~~**A content `dist_aar`.**~~ **Done** — builds, 55.3 MB, no Chrome UI in it.
+3. **The AAR with native libraries and assets**, consumed by `modules/app`: one
+   hardcoded URL, no tabs, no chrome. This is where browser-process startup
+   gets solved.
+4. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch,
+   behind the `BrowserEngine` seam in `modules/app/.../browser/engine/`, which
+   `DocumentEngine` already implements for the 0.1.0 pipeline.
+5. **Bottom bar wired to it** — the four sections from 0002, with the address
    bar and `NavigationController`.
-5. **The surfaces that are not content**: extensions (a WebUI navigation),
+6. **The surfaces that are not content**: extensions (a WebUI navigation),
    downloads, settings.
-6. **Incognito.**
+7. **Incognito.**
 
 None of this blocks [gate 2](gms-removal.md), and gate 2 should still land first
 — 0014's ordering holds, and this document does not change it. It exists so the

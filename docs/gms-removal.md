@@ -45,7 +45,7 @@ free. So the work is 13 modules, not 18.
 | | Then | Now |
 |---|---:|---:|
 | Modules | 18 | **14** |
-| First-party edges | 49 | **36** |
+| First-party edges | 49 | **32** |
 
 ## The method
 
@@ -103,12 +103,12 @@ and doing it first would mean building on a layer about to change underneath it.
 2. ~~`services/device/geolocation` — location, tasks, base, basement~~ **done**
 3. `components/media_router` — cast, cast_framework (0013: casting is dropped).
    **Bigger than it looks — see below.**
-4. ~~`components/externalauth`~~ **done**; `components/gcm_driver`,
-   `components/signin`, `components/module_installer`, `components/webauthn`,
+4. ~~`components/externalauth`~~, ~~`components/module_installer`~~ **done**;
+   `components/gcm_driver`, `components/signin`, `components/webauthn`,
    `components/omnibox`
 5. `content/public/android` — auth_api_phone, base, basement, tasks
-6. `chrome/browser/*` — omaha, password_manager, webid, webauthn, language,
-   ui/android/omnibox
+6. `chrome/browser/*` — ~~omaha~~, ~~webauthn~~, ~~language~~ **done**;
+   password_manager, webid, ui/android/omnibox
 7. `chrome/android` — last, and partly moot by then
 8. **Passwords** ([0015](decisions/0015-passwords-local-store-and-system-autofill.md))
    on the resulting GMS-free tree
@@ -333,3 +333,45 @@ answer is yes.
 Five imports were left holding nothing once the hooks went, and Chromium's Java
 checks treat an unused import as an error, so they went too. `Log` stays;
 `isSystemBuild` still uses it.
+
+## 6. Four one-edge targets — done
+
+Applied by `tools/patches/cobalt-gms-singles.py`. **Edges 36 → 32.** Grouped
+because they are the same size and shape, and because two of them were nothing
+at all.
+
+| Target | Module | What it actually was |
+|---|---|---|
+| `chrome/browser/language/android` | `tasks` | **dead** — nothing there imports GMS |
+| `components/module_installer/android` | `tasks` | **dead** in the library; only the junit test imports GMS |
+| `chrome/browser/omaha/android` | `base` | one string constant |
+| `chrome/browser/webauthn/android` | `tasks` | code that was already unreachable |
+
+### omaha: a constant, and a check that was already wrong
+
+`UpdateStatusProvider` gates "update available" on the Play Store being
+installed, via `GooglePlayServicesUtil.GOOGLE_PLAY_STORE_PACKAGE` — which is the
+string `"com.android.vending"`. Inlining it removes the target's only GMS
+dependency and changes nothing.
+
+**The check itself is left alone**, though it is already wrong for Cobalt, which
+is not distributed through the Play Store. How Cobalt updates is a product
+decision nobody has made, 0013 does not cover it, and changing update behaviour
+inside a dependency patch would be smuggling a decision in under a
+bookkeeping change. Recorded, not acted on.
+
+### webauthn: the externalauth leverage, immediately
+
+`CableAuthenticatorModuleProvider.getLinkingInformation()` opens by asking
+`ExternalAuthUtils.canUseFirstPartyGooglePlayServices()` and returning null if
+it says no. The previous patch made that `false` unconditionally, so the entire
+`Fido2ApiCall` block below the guard **was already unreachable** — the method
+already returned null on every call. Deleting it takes `gms.tasks.Task` with it.
+
+That is the argument for having done `externalauth` first, arriving one patch
+later than the claim: it converts downstream GMS paths into dead code *before*
+anyone has to reason about what removing them would break, because the answer is
+already "nothing, it never ran".
+
+Two imports were orphaned by that deletion — `Parcel` and `Fido2ApiCall` — and
+an unused import is an error under Chromium's Java checks.

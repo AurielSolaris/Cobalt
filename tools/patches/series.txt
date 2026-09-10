@@ -111,6 +111,20 @@ tool patches/cobalt-gms-chrome-java-dead-deps.py $SRC
 # removals are written, which makes the rest of 0013 safer.
 tool patches/cobalt-gms-externalauth.py $SRC
 
+# Four one-edge targets, none touching chrome/android: language and
+# module_installer listed tasks and never used it, omaha's only use was a string
+# constant, and webauthn's Fido2ApiCall block was already unreachable because
+# externalauth above it now always answers no.
+tool patches/cobalt-gms-singles.py $SRC
+
+note ===== Shell =====
+
+# Chromium cannot compile Compose (its kotlinc has no plugin support), so
+# Cobalt's interface is built in the Gradle project and Chromium arrives as an
+# AAR. This adds the dist_aar target. It is not in chrome_public_apk's graph, so
+# it costs the normal build nothing. See docs/shell-integration.md.
+tool patches/cobalt-content-aar.py $SRC
+
 note ===== Bundled extensions =====
 
 # Stages the signed uBO CRX into the APK and configures the policy that makes
