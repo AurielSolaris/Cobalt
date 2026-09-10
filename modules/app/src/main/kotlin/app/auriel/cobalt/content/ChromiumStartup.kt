@@ -4,11 +4,14 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import android.app.Application
+import org.chromium.base.ApplicationStatus
 import org.chromium.base.ContextUtils
 import org.chromium.base.PathUtils
 import org.chromium.base.library_loader.LibraryLoader
 import org.chromium.base.library_loader.LibraryProcessType
 import org.chromium.content_public.browser.BrowserStartupController
+import org.chromium.ui.base.ResourceBundle
 
 /**
  * Starts Chromium's browser process from Cobalt's Gradle app.
@@ -34,9 +37,12 @@ import org.chromium.content_public.browser.BrowserStartupController
  * 1. [ContextUtils.initApplicationContext] — everything below reads it.
  * 2. [PathUtils.setPrivateDataDirectorySuffix] — must happen before anything
  *    asks for a path, and Chromium asks early.
- * 3. [LibraryLoader] — loads `libchrome.so` and runs its JNI registration.
+ * 3. [ResourceBundle.setAvailablePakLocales] — which locales this APK has a
+ *    `.pak` for. Chromium reads it while the browser process starts and aborts
+ *    if nothing was ever registered.
+ * 4. [LibraryLoader] — loads `libchrome.so` and runs its JNI registration.
  *    This is where a registration mismatch would surface.
- * 4. [BrowserStartupController.startBrowserProcessesAsync] — the browser
+ * 5. [BrowserStartupController.startBrowserProcessesAsync] — the browser
  *    process proper, asynchronously, on the UI thread.
  *
  * ## What this deliberately does not do
@@ -79,6 +85,48 @@ object ChromiumStartup {
     }
 
     /**
+     * Which locales this APK actually has a `.pak` for, read from the APK.
+     *
+     * Chromium will not start without this list. `ResourceBundle` is documented
+     * to require it — "clients MUST call either `setAvailablePakLocales` or
+     * `setNoAvailableLocalePaks`" — and Chrome's own call site is
+     * `SplitCompatApplication`, passing the generated `ProductConfig.LOCALES`.
+     * That class is generated per-APK, like `BuildConfig` and `NativeLibraries`,
+     * so it cannot arrive in the AAR, and without it startup dies in C++ with a
+     * message that names neither the list nor the class:
+     *
+     *     [FATAL:chrome/browser/chrome_resource_bundle_helper.cc:91]
+     *     Check failed: !actual_locale.empty(). Locale could not be found for
+     *
+     * Reading the asset directory is better than transcribing `ProductConfig`
+     * here. The list would otherwise be a second copy of a fact the APK already
+     * states, and a copy that silently goes stale the first time the locale set
+     * changes — into this same fatal, or worse, into a locale that resolves to
+     * a `.pak` that is not there.
+     *
+     * The gendered variants are excluded. They are a suffix on the base locale
+     * (`af.pak`, `af_FEMININE.pak`), and `getLocalePakResourcePath` appends the
+     * suffix itself from the `Gender` it is passed; listing them as locales in
+     * their own right would offer Chromium `af_NEUTER` as a UI language.
+     */
+    private fun pakLocales(context: Context): Array<String> {
+        val names = context.assets.list("locales").orEmpty()
+        val locales = names
+            .filter { it.endsWith(".pak") }
+            .map { it.removeSuffix(".pak") }
+            .filterNot { GENDER_SUFFIXES.any(it::endsWith) }
+            .distinct()
+            .sorted()
+        check(locales.isNotEmpty()) {
+            "no locale .pak files in assets/locales; the export step " +
+                "(tools/build/export-aar.sh) did not run or the APK dropped them"
+        }
+        return locales.toTypedArray()
+    }
+
+    private val GENDER_SUFFIXES = listOf("_FEMININE", "_MASCULINE", "_NEUTER")
+
+    /**
      * Brings up the browser process. Safe to call more than once; only the
      * first call does anything.
      *
@@ -102,11 +150,43 @@ object ChromiumStartup {
         }
 
         try {
+            // Chrome's own Application subclass does this; Cobalt's does not
+            // subclass it, so nothing had. Without it Chromium's Java asserts
+            // the moment anything asks whether an Activity is visible:
+            //
+            //   java.lang.AssertionError
+            //     at ApplicationStatus.hasVisibleActivities
+            //     at UmaSessionStats.hasVisibleActivity
+            //
+            // It has to happen before the browser process starts, because
+            // Chrome's post-startup Java asks immediately.
+            // Guarded, not unconditional: initialize() opens with
+            // `assert !isInitialized()`, so a second call throws rather
+            // than doing nothing. CobaltApplication normally gets here
+            // first -- it has to, because the listener it registers only
+            // sees Activities created after it -- and this remains for
+            // the cases where no Application ran, such as a test runner.
+            if (!ApplicationStatus.isInitialized()) {
+                (app as? Application)?.let { ApplicationStatus.initialize(it) }
+            }
+        } catch (t: Throwable) {
+            _state.value = State.Failed("ApplicationStatus.initialize", t)
+            return
+        }
+
+        try {
             // Before any Chromium code asks for a path, which several do during
             // library load.
             PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_SUFFIX)
         } catch (t: Throwable) {
             _state.value = State.Failed("PathUtils.setPrivateDataDirectorySuffix", t)
+            return
+        }
+
+        try {
+            ResourceBundle.setAvailablePakLocales(pakLocales(app))
+        } catch (t: Throwable) {
+            _state.value = State.Failed("ResourceBundle.setAvailablePakLocales", t)
             return
         }
 

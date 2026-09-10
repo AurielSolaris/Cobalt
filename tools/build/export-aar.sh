@@ -71,6 +71,65 @@ printf '  %s  %.1f MB\n' "modules/app/libs/cobalt-content.aar" \
     "$(echo "scale=1; $(stat -c %s "$LIBS/cobalt-content.aar") / 1048576" | bc)"
 
 echo
+echo "=== JNI registration"
+# org.jni_zero.GEN_JNI and J.N are the classes libchrome.so registers its native
+# methods against. They cannot come in the AAR: every Java target filters
+# GEN_JNI out of its main jar by design, so that exactly one copy reaches the
+# APK, and dist_aar packages main jars.
+#
+# "Exactly one copy per APK" makes this the APK's business, and Cobalt's Gradle
+# app is the APK -- the same reason BuildConfig and NativeLibraries are written
+# by hand in src/main/java. These two are generated and large, so they are
+# copied rather than transcribed.
+JNI_SRCJAR="$SRC/$OUT/gen/chrome/android/libchrome__jni_registration.srcjar"
+JNI_DEST="$REPO/modules/app/src/chromium/java"
+# Staleness is the real risk here, not absence.
+#
+# cobalt_content_dist_aar does not depend on the JNI registration -- only
+# chrome_public_apk does -- so building the AAR relinks libchrome.so and leaves
+# this srcjar exactly as it was. Adding Java that declares native methods then
+# produces an AAR and a registration that disagree, and the disagreement is
+# invisible until the method is called:
+#
+#   NoSuchMethodError: No static method
+#   org_chromium_components_embedder_1support_view_ContentViewRenderView_init
+#   in class Lorg/jni_zero/GEN_JNI;
+#
+# So it is compared against the library it has to match.
+if [ -f "$JNI_SRCJAR" ] && [ "$SRC/$OUT/libchrome.so" -nt "$JNI_SRCJAR" ]; then
+    echo "  STALE: $JNI_SRCJAR is older than libchrome.so" >&2
+    echo "  The registration and the library must be generated from the same" >&2
+    echo "  Java. Rebuild it:" >&2
+    echo "    autoninja -C $OUT -j 6 chrome/android:libchrome__jni_registration" >&2
+    exit 1
+fi
+
+if [ ! -f "$JNI_SRCJAR" ]; then
+    echo "  MISSING: $JNI_SRCJAR" >&2
+    echo "  build it:  autoninja -C $OUT chrome/android:libchrome__jni_registration" >&2
+    exit 1
+fi
+rm -rf "$JNI_DEST"
+mkdir -p "$JNI_DEST"
+unzip -qo "$JNI_SRCJAR" -d "$JNI_DEST"
+for f in "org/jni_zero/GEN_JNI.java" "J/N.java"; do
+    if [ -f "$JNI_DEST/$f" ]; then
+        printf '  %-24s %s bytes
+' "$f" "$(stat -c %s "$JNI_DEST/$f")"
+    else
+        printf '  %-24s MISSING
+' "$f"
+    fi
+done
+
+echo
+echo "=== R classes"
+# dist_aar strips every generated R, and Chromium has ~145 of them -- one per
+# resource_package. They are regenerated here as forwarders to the app's R,
+# because Chromium's own carry ids from Chromium's aapt2 link, not the app's.
+python3 "$REPO/tools/build/generate-chromium-r.py"     "$LIBS/cobalt-content.aar"     "$REPO/modules/app/src/chromium/r"     app.auriel.cobalt
+
+echo
 echo "=== assets, from ChromePublic.apk"
 # -o overwrite, -q quiet, -d destination. The leading assets/ is stripped so the
 # files land where Android's AssetManager will serve them from.

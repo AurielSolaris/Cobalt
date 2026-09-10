@@ -42,10 +42,25 @@ free. So the work is 13 modules, not 18.
 
 ### Now
 
-| | Then | Now |
+| | Then | Now (measured 2026-09-11) |
 |---|---:|---:|
-| Modules | 18 | **14** |
-| First-party edges | 49 | **32** |
+| Modules reaching the APK | 18 | **18** |
+| ...with a first-party user | — | **13** |
+| First-party edges | 49 | **43** |
+
+**The "Now" column is what `tools/build/gms-inventory.sh` prints today, and it
+does not match what this table said before (14 modules, 32 edges).** Part of the
+gap is known: three `chrome_java` dead-dep removals were recorded as done and
+then reverted when they broke `chrome_public_apk` — `language`,
+`module_installer` and `externalauth` are all back in the inventory. That
+accounts for a few edges, not eleven, and no attempt is made here to reconstruct
+the rest. The earlier figures are treated as superseded rather than reconciled,
+because a number nobody can reproduce is worse than one that is merely
+disappointing. Re-run the script; believe the script.
+
+The five modules with no first-party user at all — `clearcut`,
+`cloud_messaging`, `flags`, `phenotype`, `stats` — arrive purely transitively
+and will fall out when their referrers do.
 
 ## The method
 

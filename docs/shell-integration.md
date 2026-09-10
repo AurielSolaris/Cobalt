@@ -5,7 +5,7 @@ settled long ago — [0002](decisions/0002-shell-design.md) and
 [0007](decisions/0007-user-themes.md) cover palette, shape, fonts and the four
 bottom sections. This is about the seam: how a Compose UI drives Chromium.
 
-**Status: the two viability questions are closed and the first spike is done.** Nothing here is built. The point of
+**Status: gate 3's viability is proven end to end — Chromium renders a page inside Cobalt's Compose app.** The interface itself is not built. The point of
 writing it now is that the two questions that could have changed the plan are
 both answered, and they came back favourably.
 
@@ -261,7 +261,7 @@ than a configuration nicety:
 | `Duplicate class _COROUTINE...`, `androidx...` | the AAR carries its whole closure | `jar_excluded_patterns` for androidx, kotlin, kotlinx |
 | `Duplicate class ...ListenableFuture` | androidx pulls the empty `listenablefuture` stub; the AAR has real Guava | exclude the stub in Gradle |
 | `AAPT: res/0_res/anim: resource file cannot be a directory` | `dist_aar` writes `res/<n>_res/…`, which is not an AAR layout | `flatten-aar-res.py`, which refuses if there is ever more than one index |
-| duplicate `attr/elevation` *inside* the AAR | androidx resources travel even with androidx classes excluded | `resource_excluded_patterns = ["*"]`, a real limitation |
+| duplicate `attr/elevation` *inside* the AAR | androidx resources travel even with androidx classes excluded | excluding them was **wrong** and is undone; see "The resources have to come" below |
 
 Result: a **257.8 MB APK** built by Gradle from Compose source, carrying
 `libchrome.so` uncompressed and 341 assets.
@@ -306,6 +306,86 @@ that is not a coincidence.
 Cost: multiplexing exists to shrink the JNI table, so this gives up binary size.
 Unmeasured, and worth measuring once the shell runs.
 
+## Closed: the page renders
+
+**Chromium's browser process starts from Cobalt's Gradle app, and a
+`WebContents` draws a real website into a Compose window.** That was the last
+viability question in this document, and it is answered by
+`content/ChromiumPageActivity.kt` rather than by an argument.
+
+Getting there was seven distinct failures, and none of them was the one this
+document spent its length worrying about. They are listed because each is a
+property of embedding Chromium that no amount of `gn path` would have found.
+
+| Failure | What it actually was |
+|---|---|
+| `NoClassDefFoundError: org/chromium/ui/R$integer` | `dist_aar` strips every generated `R`, and Chromium has ~160 of them, one per `resource_package` |
+| `Check failed: !actual_locale.empty()` | `ResourceBundle.setAvailablePakLocales` was never called; Chrome passes generated `ProductConfig.LOCALES`, which is per-APK |
+| `Failed to find class DataSharingNetworkLoaderImpl`, then SIGTRAP | the AAR depended on `chrome_java`; the APK depends on the `chrome_all_java` group |
+| `ClassNotFoundException: androidx.appcompat.app.AppCompatActivity` | `ChromeActivity` extends it, and the AAR excludes androidx |
+| `GooglePlayServicesMissingManifestValueException` | `GoogleApiAvailability` validates *your* manifest before answering, so asking it whether GMS exists throws |
+| `PackageManager$NameNotFoundException: SandboxedProcessService0` | child processes are Services and a manifest must declare all 50 |
+| `NoSuchMethodError: ...ContentViewRenderView_init in GEN_JNI` | the registration srcjar had not been rebuilt |
+
+### The resources have to come, and the duplicates are merged on the way out
+
+Excluding the AAR's resources moved the failure from build time to runtime,
+where it is worse: Chromium's Java references its own `R` classes.
+
+So they travel, and `tools/build/flatten-aar-res.py` resolves the duplicates.
+It grew four rules, each from a failure:
+
+- **The prefix is `res/<n>_<name>/`**, not `res/<n>_res/`. Cobalt's AAR has nine
+  such directories. The old guard — refuse more than one index — was a proxy for
+  the real question and answered it wrongly; it now checks for a **path
+  collision** directly, and there are none.
+- **A top-level `<attr>` and one nested in a `<declare-styleable>` define the
+  same resource**, and AGP counts both.
+- **`<declare-styleable>` is unioned, not deduplicated.** AppCompat and Material
+  both declare `SearchView` with different contents; keeping the first deleted
+  `queryBackground`, `searchIcon` and the rest while leaving the styles that
+  reference them.
+- **`R.txt` needs the same treatment**, and a symbol it marks `0x0` is
+  undefined — a resource this build does not ship.
+
+### The R classes are regenerated as forwarders
+
+`tools/build/generate-chromium-r.py` reads the AAR's 36,000 class constant pools
+for `R$type` field references and writes one `R` per package, every field
+forwarding to the app's `R`:
+
+    public static final int min_screen_width_bucket =
+        app.auriel.cobalt.R.integer.min_screen_width_bucket;
+
+160 classes, 10,626 fields. Shipping Chromium's own would have compiled and then
+returned ids from the wrong aapt2 link. This needs
+`android.nonTransitiveRClass=false`.
+
+### ContentViewRenderView had to be put into the build
+
+The `View` a `WebContents` composites into is Chromium's own, in
+`//components/embedder_support/android` — and **Chrome does not use it**, so
+neither half was in `chrome_public_apk`'s graph:
+
+    $ strings out/Default/libchrome.so | grep -c ContentViewRenderView
+    0
+
+`cobalt-content-view-render-view.py` adds the Java to `chrome_all_java` and the
+C++ to `libchrome`. Both, and in those specific places: `GEN_JNI` is generated
+from `java_targets = [ "//chrome/android:chrome_public_apk" ]`, so Java outside
+that graph gets no registration however the AAR is built.
+
+### Two things that are easy to get wrong again
+
+**The JNI registration is not rebuilt by building the AAR.** Only
+`chrome_public_apk` depends on it, so adding Java that declares native methods
+leaves the srcjar stale and the mismatch is invisible until the method is
+called. `export-aar.sh` now refuses when it is older than `libchrome.so`.
+
+**`ApplicationStatus.initialize` must run in `Application.onCreate`**, because
+the lifecycle listener it registers only sees Activities created afterwards —
+`Found untracked Activity` — and it asserts if called twice.
+
 ## What is still genuinely unknown
 
 Everything above is a dependency-graph result. These are not, and each needs a
@@ -340,11 +420,10 @@ spike of its own before anything is committed to:
 3. ~~**The AAR with native libraries.**~~ **Done** — 260 MB, and it surfaced
    two things: assets cannot travel in an AAR, and `libchrome.so`'s JNI
    registration expects Java this AAR does not carry.
-4. **`modules/app` consuming the AAR**: one hardcoded URL, no tabs, no chrome.
-   This is where browser-process startup gets solved, and it is also the only
-   test that settles whether the JNI surface is a real problem — the separate
-   `libcobalt` step was tried first and proved to be neither a fix nor
-   necessary.
+4. ~~**`modules/app` consuming the AAR**~~ **Done** — the browser process
+   starts and a `WebContents` renders a real site into a Compose window. The JNI
+   surface was a real problem and `enable_jni_multiplexing = false` was the
+   whole fix; the separate `libcobalt` was neither a fix nor necessary.
 5. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch,
    behind the `BrowserEngine` seam in `modules/app/.../browser/engine/`, which
    `DocumentEngine` already implements for the 0.1.0 pipeline.

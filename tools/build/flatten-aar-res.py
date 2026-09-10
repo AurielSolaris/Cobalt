@@ -1,29 +1,235 @@
 #!/usr/bin/env python3
 """Repair a dist_aar's resource layout so AAPT will accept it.
 
-`dist_aar` writes resources as `res/<n>_res/<type>/...`, one numbered directory
-per input resource zip — `build/android/gyp/dist_aar.py`, `_AddResources`, which
-enumerates them. An AAR's resources have to be `res/<type>/...`, and AAPT
-rejects the numbered form outright:
+`dist_aar` writes resources as `res/<n>_<name>/<config>/...`, one directory per
+input resource zip -- `build/android/gyp/dist_aar.py`, `_AddResources`, which
+enumerates them and keeps each zip's own directory name behind an index. An
+AAR's resources have to be `res/<config>/...`, and AAPT rejects the prefixed
+form outright, whatever the prefix says:
 
     ERROR: AAPT: .../res/0_res/anim: error: resource file cannot be a directory.
+    ERROR: AAPT: .../res/0_android/values-v21: error: resource file cannot be
+    a directory.
 
 So the prefix is stripped on the way into the Gradle project.
 
-**This is only safe while there is exactly one index.** Two numbered directories
-flattened into one would collide on any name they share, silently, and the
-loser would be whichever was written second. So the count is checked and this
-refuses rather than guesses.
+**Flattening is only safe when nothing collides.** Cobalt's AAR has nine of
+these directories -- `0_res`, `0_android`, `1_res_chromium`, and so on -- and
+merging them means two entries could land on the same path, silently, with the
+loser being whichever was written second. An earlier version guarded this by
+refusing more than one directory, which was a proxy for the real question and
+answered it wrongly: nine directories that share no path are fine, and two that
+share one are not. So the collision is now checked for directly.
 
 Usage:  flatten-aar-res.py <input.aar> <output.aar>
 """
 
+import collections
 import re
 import shutil
 import sys
 import zipfile
+from xml.etree import ElementTree
 
-PREFIX = re.compile(r"^res/(\d+)_res/")
+# res/<index>_<the resource zip's own directory name>/
+PREFIX = re.compile(r"^res/\d+_[^/]*/")
+# res/values/..., res/values-af/..., res/values-v21/... -- everything AAPT
+# treats as a bag of definitions rather than one file per resource.
+VALUES = re.compile(r"^res/(values(?:-[^/]+)?)/[^/]+\.xml$")
+
+
+def _merge_values(zf, entries):
+    """Merge one config's values files into one, keeping the first of each name.
+
+    dist_aar pours androidx's resource zips in beside Chromium's, and by the
+    time it does they have all been flattened into values_<n>.xml -- so the same
+    androidx attr is defined in several of them and AGP refuses:
+
+        [attr/elevation] values_11.xml [attr/elevation] values_19.xml:
+        Error: Duplicate resources
+
+    They cannot be told apart by path any more, so they are resolved by content:
+    first definition of each (tag, name) wins, the rest are dropped. First
+    rather than last because the ordering is dist_aar's dependency order, which
+    puts Chromium's own resources ahead of its dependencies'.
+
+    This runs per config directory -- `values`, `values-af`, `values-v21` --
+    because a string in values-af is a different resource from the one in
+    values, and merging the two namespaces would drop every translation.
+
+    Only values directories need this at all. Every other resource type is one
+    file per resource, so a duplicate there would be a duplicate *filename* and
+    is caught by the collision check instead.
+
+    ## attr is the awkward one
+
+    `<attr>` defines a resource from two different places -- at the top level,
+    and nested inside a `<declare-styleable>` -- and AGP counts both against the
+    same name:
+
+        Found item Attr/chipStyle more than one time
+
+    An earlier pass keyed nested definitions separately from top-level ones, so
+    a name defined first inside a styleable and then again at the top level was
+    seen as two different resources and both survived. Both forms now share one
+    key.
+
+    The two forms cannot be resolved the same way, though. A repeat *nested*
+    attr keeps its element and loses its `format`, because the styleable needs
+    the entry to keep its attribute order, and a formatless nested attr is just
+    a reference. A repeat *top-level* attr has nothing left to be once its
+    definition is gone, so it is dropped whole.
+
+    ## declare-styleable is unioned, not deduplicated
+
+    Two libraries can declare the same styleable with different contents, and
+    both are real. AppCompat and Material each declare `SearchView`; only
+    AppCompat's holds `queryBackground`, `searchIcon`, `goIcon` and the rest of
+    that family. Keeping the first and dropping the second deleted those
+    definitions while leaving the AppCompat styles that reference them, and
+    linking failed:
+
+        style attribute 'attr/queryBackground' not found
+
+    So a repeated styleable contributes its new attrs to the one already there
+    instead of being discarded. Order within the styleable ends up differing
+    from any single upstream library's, which is safe here because the R class
+    is regenerated by AGP from these same merged values -- the indices and the
+    array are always written from one source.
+    """
+    root = ElementTree.Element("resources")
+    seen = set()
+    styleables = {}
+    toplevel = {}
+    dropped = 0
+
+    def take_attr(attr, is_toplevel):
+        """Register one attr definition. True if the element should be kept."""
+        nonlocal dropped
+        if attr.get("format") is None:
+            return True  # a reference, not a definition; always fine
+        key = ("attr", attr.get("name"))
+        if key not in seen:
+            seen.add(key)
+            return True
+        if is_toplevel:
+            dropped += 1
+            return False
+        del attr.attrib["format"]
+        dropped += 1
+        return True
+
+    for info, _ in sorted(entries, key=lambda e: e[1]):
+        try:
+            parsed = ElementTree.fromstring(zf.read(info))
+        except ElementTree.ParseError:
+            # Not something this understands; leaving it out would silently lose
+            # resources, so refuse rather than guess.
+            raise SystemExit("REFUSED: %s is not parseable XML" % info.filename)
+        for child in parsed:
+            if child.tag == "declare-styleable":
+                name = child.get("name")
+                existing = styleables.get(name)
+                if existing is not None:
+                    element, have = existing
+                    for attr in list(child.iter("attr")):
+                        if attr.get("name") in have:
+                            dropped += 1
+                            continue
+                        have.add(attr.get("name"))
+                        if take_attr(attr, is_toplevel=False):
+                            element.append(attr)
+                    continue
+                styleables[name] = (
+                    child, {a.get("name") for a in child.iter("attr")})
+                for attr in child.iter("attr"):
+                    take_attr(attr, is_toplevel=False)
+                root.append(child)
+                continue
+
+            if child.tag == "attr":
+                # A top-level attr with no format still occupies the name -- as
+                # an undefined symbol -- and AAPT will not take it twice:
+                #
+                #   Duplicate key: (row=attr, column=badgeRadius),
+                #   values: [UNDEFINED attr badgeRadius, UNDEFINED attr ...]
+                #
+                # So these are deduplicated by name too, separately from the
+                # `seen` set, which tracks *definitions*. A later definition is
+                # folded into the reference already emitted rather than being
+                # appended beside it.
+                name = child.get("name")
+                existing = toplevel.get(name)
+                if existing is not None:
+                    if (existing.get("format") is None
+                            and child.get("format") is not None
+                            and ("attr", name) not in seen):
+                        existing.set("format", child.get("format"))
+                        for option in child:  # <enum>/<flag> children
+                            existing.append(option)
+                        seen.add(("attr", name))
+                    dropped += 1
+                    continue
+                if not take_attr(child, is_toplevel=True):
+                    continue
+                toplevel[name] = child
+            else:
+                key = (child.tag, child.get("name"))
+                if key in seen:
+                    dropped += 1
+                    continue
+                seen.add(key)
+                # Nested attrs outside a styleable are references only.
+
+            root.append(child)
+
+    return ElementTree.tostring(root, encoding="utf-8"), dropped
+
+
+def _merge_r_text(body: bytes):
+    """Deduplicate the AAR's R.txt the same way the values files were.
+
+    R.txt is the AAR's symbol list, and `dist_aar` concatenates one per input
+    without merging, so the same symbol appears twice -- once undefined and once
+    with an id, or twice with different styleable indices:
+
+        int attr badgeRadius 0x0
+        int attr badgeRadius 0x7f010001
+
+    AGP reads it as a table and refuses a repeated key outright:
+
+        java.lang.IllegalArgumentException: Duplicate key:
+        (row=attr, column=badgeRadius), values: [UNDEFINED attr badgeRadius ...]
+
+    First wins by name, except that a line carrying a real id beats an undefined
+    one, and a styleable array beats a shorter one -- the longer array is the
+    union, matching the styleables unioned above.
+
+    The indices in here are not authoritative and do not need to be: AGP
+    regenerates each library's R class from the symbol table aapt2 produces
+    while linking, so R.txt says *which* symbols exist, not what they resolve
+    to.
+    """
+    kept = {}
+    order = []
+    dropped = 0
+    for line in body.decode("utf-8").splitlines():
+        parts = line.split(None, 3)
+        if len(parts) < 3:
+            continue
+        key = (parts[1], parts[2])
+        if key not in kept:
+            kept[key] = line
+            order.append(key)
+            continue
+        dropped += 1
+        old = kept[key]
+        if line.startswith("int[] "):
+            if line.count(",") > old.count(","):
+                kept[key] = line
+        elif old.endswith(" 0x0") and not line.endswith(" 0x0"):
+            kept[key] = line
+    return ("\n".join(kept[k] for k in order) + "\n").encode("utf-8"), dropped
 
 
 def main() -> int:
@@ -34,39 +240,72 @@ def main() -> int:
     src, dst = sys.argv[1], sys.argv[2]
 
     with zipfile.ZipFile(src) as z:
-        names = z.namelist()
-        indices = {m.group(1) for m in (PREFIX.match(n) for n in names) if m}
+        infos = [i for i in z.infolist() if not i.filename.endswith("/")]
 
-        if len(indices) > 1:
-            print("REFUSED: %d resource index directories (%s). Flattening them "
-                  "would collide on shared names. dist_aar's layout has changed "
-                  "and this needs rethinking rather than forcing."
-                  % (len(indices), ", ".join(sorted(indices))), file=sys.stderr)
-            return 1
-
-        if not indices:
+        if not any(PREFIX.match(i.filename) for i in infos):
             shutil.copyfile(src, dst)
-            print("  no res/<n>_res/ prefix to strip")
+            print("  no res/<n>_*/ prefix to strip")
             return 0
 
         moved = 0
+        flat = []
+        for info in infos:
+            name = PREFIX.sub("res/", info.filename)
+            if name != info.filename:
+                moved += 1
+            flat.append((info, name))
+
+        # The whole safety argument for flattening, checked rather than assumed.
+        by_name = collections.defaultdict(list)
+        for info, name in flat:
+            by_name[name].append(info.filename)
+        collisions = {k: v for k, v in by_name.items() if len(v) > 1}
+        if collisions:
+            print("REFUSED: %d path(s) collide once the prefixes are stripped. "
+                  "Flattening would keep whichever was written second and lose "
+                  "the rest. dist_aar's layout has changed and this needs "
+                  "rethinking rather than forcing." % len(collisions),
+                  file=sys.stderr)
+            for name, sources in sorted(collisions.items())[:10]:
+                print("  %s  <-  %s" % (name, ", ".join(sources)),
+                      file=sys.stderr)
+            return 1
+
+        values = collections.defaultdict(list)
+        other = []
+        for info, name in flat:
+            m = VALUES.match(name)
+            if m:
+                values[m.group(1)].append((info, name))
+            else:
+                other.append((info, name))
+
+        dropped = 0
+        r_dropped = 0
+        merged = {}
+        for config, entries in values.items():
+            merged[config], n = _merge_values(z, entries)
+            dropped += n
+
         with zipfile.ZipFile(dst, "w") as out:
-            for info in z.infolist():
-                # Copy the entry's own header rather than letting zipfile pick,
-                # so each keeps its original compression. dist_aar stores
-                # libchrome.so uncompressed; deflating it here would spend a
-                # couple of minutes per export shrinking 205 MB that AGP
-                # re-expands anyway when it packages the APK.
-                out_info = zipfile.ZipInfo(info.filename, info.date_time)
+            for info, name in other:
+                # Copy each entry's own header so compression is preserved.
+                # dist_aar stores libchrome.so uncompressed; deflating it here
+                # would spend minutes shrinking 205 MB that AGP re-expands.
+                out_info = zipfile.ZipInfo(name, info.date_time)
                 out_info.compress_type = info.compress_type
                 out_info.external_attr = info.external_attr
-                if PREFIX.match(out_info.filename):
-                    out_info.filename = PREFIX.sub("res/", out_info.filename)
-                    moved += 1
-                out.writestr(out_info, z.read(info))
+                payload = z.read(info)
+                if name == "R.txt":
+                    payload, r_dropped = _merge_r_text(payload)
+                out.writestr(out_info, payload)
+            for config, body in merged.items():
+                out.writestr("res/%s/values.xml" % config, body)
 
-    print("  flattened %d resource entries out of res/%s_res/"
-          % (moved, indices.pop()))
+    print("  flattened %d resource entries out of res/<n>_*/" % moved)
+    print("  merged %d values configs, dropping %d duplicate definitions"
+          % (len(merged), dropped))
+    print("  deduplicated R.txt, dropping %d repeated symbols" % r_dropped)
     return 0
 
 
