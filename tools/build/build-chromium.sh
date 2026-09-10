@@ -119,6 +119,29 @@ enable_cardboard = false
 
 # Keep the resource-heavy extras off for the first build.
 enable_resource_allowlist_generation = false
+
+# --- Embedding Cobalt's shell ---------------------------------------------
+#
+# JNI multiplexing hashes the whole JNI surface and dispatches through a
+# generated J.N class. The native table and the Java class must agree exactly,
+# and they cannot when Chromium's Java is packaged as an AAR for a separate app
+# to consume: the app's J.N is generated from the AAR's Java, libchrome.so's
+# table from chrome_public_apk's. The result is a hard abort during library
+# load, before anything runs:
+#
+#   java.lang.AssertionError: JNI multiplexing hash lookup failed with J.N
+#       at org.jni_zero.JniInit.crashIfMultiplexingMisaligned
+#
+# Without multiplexing, registration is by name, and jni_zero's defaults
+# (add_stubs_for_missing_jni, remove_uncalled_jni) do the rest.
+#
+# chromecast sets this false too -- chromecast/build/args/config/flavor/release.gni --
+# and chromecast is also the one build in the tree that ships a dist_aar. The
+# two go together, and that is not a coincidence.
+#
+# Cost: multiplexing exists to shrink the JNI table, so this gives up some
+# binary size. Unmeasured, and worth measuring once the shell runs.
+enable_jni_multiplexing = false
 EOF
     echo "wrote $SRC/$OUT/args.gn:"
     sed 's/^/    /' "$OUT/args.gn"

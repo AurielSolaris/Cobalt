@@ -4,6 +4,35 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+        Background media playback.
+
+        A browser that stops the audio the moment you switch apps is not a
+        browser people can listen to anything with, and on Android keeping audio
+        alive in the background is not a passive thing: it needs a foreground
+        service with a media type, and that service needs a notification, which
+        on API 33+ needs the user's permission.
+
+        Three permissions, and each one earns its place:
+
+          FOREGROUND_SERVICE               the service itself
+          FOREGROUND_SERVICE_MEDIA_PLAYBACK  its type, required from API 34.
+                                           Declaring the type narrows what the
+                                           service is allowed to do, which is
+                                           why Android asks for it separately.
+          POST_NOTIFICATIONS               the playback notification, from
+                                           API 33. Runtime-granted, so the user
+                                           is asked and can refuse.
+
+        WAKE_LOCK is deliberately absent. Audio playback holds the CPU awake
+        through the audio focus and foreground service, and a browser taking a
+        wake lock of its own is how a browser ends up blamed for a flat battery.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -32,6 +61,17 @@
             A SurfaceView's compositing behaviour is exactly what is under test,
             and overriding it here would test something else.
         -->
+        <!--
+            Brings up Chromium's browser process from this app. Not exported,
+            so launching needs root; see the class KDoc. Present only in debug
+            builds in spirit, but kept here because the manifest has no build
+            variant split yet and an unexported activity is not reachable.
+        -->
+        <activity
+            android:name=".content.ChromiumStartupActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
         <activity
             android:name=".content.ContentSurfaceSpikeActivity"
             android:exported="false"

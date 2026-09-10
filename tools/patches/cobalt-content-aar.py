@@ -157,12 +157,58 @@ dist_aar("cobalt_content_dist_aar") {
 
   output = "$root_build_dir/apks/cobalt_content.aar"
 
-  # Signatures and build metadata are not API and only cause conflicts in a
-  # consumer's merge step. Same exclusion cast_browser_dist_aar uses.
   jar_excluded_patterns = [
+    # Signatures and build metadata are not API and only conflict in a
+    # consumer's merge step. Same exclusion cast_browser_dist_aar uses.
     "META-INF/*",
     "*.aidl",
+
+    # Everything below is a library the consuming app already has, and shipping
+    # a second copy is a hard build failure rather than a waste:
+    #
+    #   Duplicate class _COROUTINE.ArtificialStackFrames found in modules
+    #   cobalt-content.aar and kotlinx-coroutines-core-jvm-1.9.0.jar
+    #
+    # Cobalt's app needs androidx and Kotlin from Maven for Compose, so the AAR
+    # is the copy that gives way. Guava and protobuf are deliberately NOT
+    # excluded -- Chromium's Java uses them and the app does not depend on them
+    # otherwise, so the AAR is their only source.
+    #
+    # This leaves a real risk worth naming: Chromium's Java was compiled against
+    # Chromium's androidx, and now runs against the app's. A version skew shows
+    # up at runtime, not here.
+    "androidx/*",
+    "android/support/*",
+    "kotlin/*",
+    "kotlinx/*",
+    "_COROUTINE/*",
+    "org/jetbrains/annotations/*",
+    "org/intellij/*",
   ]
+
+  # No Android resources, for now.
+  #
+  # The resource zips carry androidx's resources alongside Chromium's, and
+  # excluding androidx's *classes* above does not exclude those. The result is
+  # duplicate definitions inside the AAR itself, which AGP refuses:
+  #
+  #   [attr/elevation] values_11.xml [attr/elevation] values_19.xml:
+  #   Error: Duplicate resources
+  #
+  # They cannot be excluded by path either -- dist_aar has already merged every
+  # source into values_<n>.xml, so androidx's and Chromium's are indistinguishable
+  # by then.
+  #
+  # This is a real limitation and not a decision. Chromium's Java does use its
+  # own resources -- layouts for its dialogs, drawables, strings -- and anything
+  # that reaches for one will fail at runtime with a missing resource rather than
+  # at build time. Starting the browser process does not need them, which is what
+  # this is for; the shell's later surfaces may.
+  #
+  # The fix, when it is needed, is to stop excluding androidx classes and instead
+  # keep the AAR's copies while excluding the app's -- or to split the resource
+  # zips before dist_aar merges them.
+  resource_excluded_patterns = [ "*" ]
 }
 '''
 

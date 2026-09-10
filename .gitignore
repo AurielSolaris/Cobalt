@@ -37,3 +37,10 @@ keystore.properties
 # Python bytecode from running the patch and asset tools
 __pycache__/
 *.pyc
+
+# Chromium artifacts copied in by tools/build/export-aar.sh.
+#
+# The AAR is ~260 MB and the assets ~70 MB, and both are reproducible from the
+# Chromium checkout in under a minute. A git repository is not a binary cache.
+modules/app/libs/
+modules/app/src/chromium/assets/
