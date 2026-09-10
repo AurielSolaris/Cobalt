@@ -22,6 +22,21 @@
             name. Stage 9 revisits this with a per-site policy and an interstitial.
         -->
 
+        <!--
+            The Compose-over-SurfaceView spike (docs/shell-integration.md).
+            Not exported, so it is not product surface. That also means
+            `adb shell am start` cannot reach it and launching needs root; see
+            the class KDoc.
+
+            android:hardwareAccelerated is left at the default deliberately.
+            A SurfaceView's compositing behaviour is exactly what is under test,
+            and overriding it here would test something else.
+        -->
+        <activity
+            android:name=".content.ContentSurfaceSpikeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

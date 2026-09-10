@@ -5,7 +5,7 @@ settled long ago — [0002](decisions/0002-shell-design.md) and
 [0007](decisions/0007-user-themes.md) cover palette, shape, fonts and the four
 bottom sections. This is about the seam: how a Compose UI drives Chromium.
 
-**Status: investigated, not started.** Nothing here is built. The point of
+**Status: the two viability questions are closed and the first spike is done.** Nothing here is built. The point of
 writing it now is that the two questions that could have changed the plan are
 both answered, and they came back favourably.
 
@@ -70,16 +70,78 @@ finally connects. `WebNavigationEventRouter` is compiled out on Android, so
 tab model, that guard is where it hooks in. See
 [`ublock-bundling.md`](ublock-bundling.md).
 
-## What is genuinely unknown
+## The architecture this actually implies — and it inverts the obvious one
+
+The obvious plan is "write Cobalt's Compose shell inside Chromium's build,
+next to `chrome_java`". **That does not work**, and it is better to know now:
+
+- Chromium **ships** the Compose runtime — `third_party/androidx` carries
+  `androidx_compose_runtime`, `_ui`, `_foundation`, `_animation` and
+  `_material3`, 227 references in one BUILD.gn.
+- Chromium **cannot compile** Compose source. `@Composable` requires the Compose
+  Kotlin compiler plugin, and `build/android/gyp/kotlinc.py` has no plugin
+  support at all — no `-Xplugin`, nothing. Nothing in the tree uses Compose
+  today; the libraries are transitive baggage.
+
+So the dependency runs the other way round. Chromium's own build has the
+template for it:
+
+```
+build/config/android/rules.gni:1687   template("dist_aar")
+chromecast/BUILD.gn:717               dist_aar("cast_browser_dist_aar")
+```
+
+`dist_aar` packages Java, **native libraries**, assets, resources and a manifest
+into an `.aar`. So:
+
+**Chromium's content layer is exported as an AAR, and Cobalt's existing Gradle
+app consumes it.** The Compose interface stays where Compose already works —
+`modules/app`, which has Material3, the theme, and the screens from 0.1.0 — and
+Chromium becomes a dependency of Cobalt rather than Cobalt becoming a patch to
+Chromium.
+
+That is also better for every reason
+[`gms-removal.md`](gms-removal.md) already argues: the shell is Cobalt-owned code
+in Cobalt-owned files, and it never conflicts on rebase.
+
+**Unverified:** no `dist_aar` has been built for content yet, and the size and
+dependency closure are unknown. That is the next spike after the one below.
+
+## Closed: Compose draws over the content surface
+
+The riskiest unknown, and it is answered.
+
+`ContentViewRenderView` composites into a `SurfaceView`, which SurfaceFlinger
+composites rather than the view hierarchy — so "does Compose draw on top" is not
+answerable from Compose's painting rules. If it did not, Cobalt's entire
+interface would need a different structure.
+
+`modules/app/.../content/ContentSurface.kt` hosts a real `SurfaceView` in an
+`AndroidView`, painted through its holder with `lockCanvas` so the pixels come
+from the surface rather than from Compose. `ContentSurfaceSpike.kt` puts Compose
+chrome above and below it and offers a switch on `setZOrderOnTop`.
+
+| `setZOrderOnTop` | Result |
+|---|---|
+| `false` (default) | **Compose chrome draws over the surface** — address bar and bottom bar both visible |
+| `true` | **all Compose chrome disappears** behind the surface |
+
+Verified on device, both states, screenshots taken. The negative control is what
+makes it conclusive: the difference is entirely `setZOrderOnTop`, and the
+default is the one Cobalt needs. `ContentViewRenderView` defaults to `false` for
+the same reason, so this is the supported direction rather than a lucky accident.
+
+Kept as a runnable screen rather than deleted — it is the regression test for
+the seam. When `ContentViewRenderView` replaces the placeholder, the screen
+should behave identically.
+
+## What is still genuinely unknown
 
 Everything above is a dependency-graph result. These are not, and each needs a
 spike of its own before anything is committed to:
 
-- **Compose over a SurfaceView.** `ContentViewRenderView` owns a
-  `SurfaceView`/`TextureView`. Putting that inside `AndroidView` inside a Compose
-  tree, with correct z-order against Compose-drawn chrome, is the single most
-  likely source of unpleasant surprises. **Spike this first** — a Compose
-  activity showing one page, nothing else.
+- **A content `dist_aar`.** Does it build, how large is it, and what does its
+  dependency closure drag in? This is now the riskiest open question.
 - **What `chrome/browser` expects that only `chrome/android` provides.** The
   extension WebUI is clean, but other browser-layer code reaches into Java
   through interfaces Chrome's Android layer implements. This is the same
@@ -93,14 +155,15 @@ spike of its own before anything is committed to:
 
 ## Order this should go in
 
-1. **Compose + `ContentViewRenderView` spike.** One activity, one hardcoded URL,
-   no tabs, no chrome. Answers the riskiest unknown for a day's work.
-2. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch.
-3. **Bottom bar wired to it** — the four sections from 0002, with the address
+1. ~~**Compose + SurfaceView spike.**~~ **Done** — Compose draws over it.
+2. **A content `dist_aar`**, consumed by `modules/app`. One hardcoded URL, no
+   tabs, no chrome.
+3. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch.
+4. **Bottom bar wired to it** — the four sections from 0002, with the address
    bar and `NavigationController`.
-4. **The surfaces that are not content**: extensions (a WebUI navigation),
+5. **The surfaces that are not content**: extensions (a WebUI navigation),
    downloads, settings.
-5. **Incognito.**
+6. **Incognito.**
 
 None of this blocks [gate 2](gms-removal.md), and gate 2 should still land first
 — 0014's ordering holds, and this document does not change it. It exists so the
