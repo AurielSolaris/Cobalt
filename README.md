@@ -88,6 +88,32 @@ The full reasoning, including the part of the Android analogy that does **not**
 carry — Chromium publishes no LTS branch, so the curation is ours to do — is in
 [decision 0016](docs/decisions/0016-pin-chromium-140-and-backport.md).
 
+Knowing *what* to backport is the hard part, because Chromium restricts
+visibility on security bugs until well after a fix ships. Cobalt corroborates
+across independent Chromium forks — Vanadium, Cromite, Brave — on top of
+upstream's own record, because every fork carrying an out-of-tree patch set has
+the same problem and several have been solving it for years
+([decision 0017](docs/decisions/0017-corroborate-security-fixes-across-forks.md)).
+That runs daily as `.github/workflows/security-watch.yml`, which files a triage
+issue per CVE; the procedure is in
+[`docs/backporting.md`](docs/backporting.md). Forks are a signal, not a source
+of code: the patch itself comes from upstream, adapted to M140.
+
+## What Cobalt does not ship
+
+**Google Play Services is being removed entirely**
+([decision 0013](docs/decisions/0013-remove-google-play-services.md)), and it is
+a release gate. Progress is a number anyone can produce —
+`tools/build/gms-inventory.sh` reads the shipped APK's real dependency graph —
+and it currently reads **14 modules, down from 18**. See
+[`docs/gms-removal.md`](docs/gms-removal.md).
+
+**WebXR, WebUSB and Web NFC are off.** Each hands a web page access to hardware
+that essentially no site uses, on a browser targeting 4 GB and two cores. WebHID
+was already off — upstream never enables it on Android. **Web Bluetooth stays**,
+and is ask-before-use by default, which upstream already implements properly.
+See [`docs/device-apis.md`](docs/device-apis.md).
+
 ## Building it yourself
 
 Everything Cobalt changes about Chromium is declared in

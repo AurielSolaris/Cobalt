@@ -100,8 +100,18 @@ chrome_public_manifest_package = "app.auriel.cobalt"
 #
 # A phone that struggles with WebGL is not running WebXR workloads, and each of
 # these is binary size and attack surface for something this hardware will not
-# meaningfully use. WebHID has no GN flag -- it is runtime-gated -- so it is
-# turned off as a feature default instead.
+# meaningfully use.
+#
+# These flags remove WebXR's device backends. They do NOT remove the API: with
+# all four set false, navigator.xr was still exposed on a real device and inline
+# sessions still ran. An earlier version of this comment claimed otherwise, and
+# also credited Cobalt with turning WebHID off -- upstream does that, on every
+# Android build, and always has.
+#
+# The API surfaces are removed in the patch series instead, because WebXR,
+# WebUSB and Web NFC all declare base_feature: "none" and so have no GN flag and
+# no --disable-features name. See tools/patches/cobalt-disable-device-apis.py
+# and docs/device-apis.md.
 enable_vr = false
 enable_openxr = false
 enable_arcore = false

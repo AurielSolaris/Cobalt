@@ -77,6 +77,23 @@ note ===== Android platform fixes =====
 # docs/extension-loading-android.md.
 tool patches/cobalt-saf-file-enumerator.py $SRC
 
+note ===== Features Cobalt does not ship =====
+
+# args.gn's enable_vr/openxr/arcore/cardboard remove WebXR's device backends
+# but leave navigator.xr exposed and inline sessions working -- measured on a
+# device, not read off the GN files. This removes the APIs themselves: WebXR,
+# WebUSB and Web NFC. WebHID needs no patch (upstream leaves it off on Android)
+# and Web Bluetooth stays, already ASK-by-default. See docs/device-apis.md.
+tool patches/cobalt-disable-device-apis.py $SRC
+
+note ===== Google Play Services removal (decision 0013) =====
+
+# Barcode and text detection on Android are GMS vision wrappers with no other
+# implementation; face detection has an AOSP one. This takes the vision AARs
+# out, leaving upstream's own no-Play-Services behaviour. Removes 4 of 18 GMS
+# modules from the APK. See docs/gms-removal.md.
+tool patches/cobalt-gms-shape-detection.py $SRC
+
 note ===== Bundled extensions =====
 
 # Stages the signed uBO CRX into the APK and configures the policy that makes
