@@ -114,6 +114,12 @@ was already off — upstream never enables it on Android. **Web Bluetooth stays*
 and is ask-before-use by default, which upstream already implements properly.
 See [`docs/device-apis.md`](docs/device-apis.md).
 
+**The APK is much larger than it should be** — 318 MB, 525 MB installed, against
+Google's own WebView at 76 MB for the same engine on the same device. Almost all
+of that is build configuration rather than Chromium, and the levers are measured
+and ranked in [`docs/apk-size.md`](docs/apk-size.md). None has been pulled yet:
+the largest needs a stable tree to be worth doing safely.
+
 ## Building it yourself
 
 Everything Cobalt changes about Chromium is declared in

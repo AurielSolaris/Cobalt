@@ -9,13 +9,24 @@ None is load-bearing for browsing.
 
 ## State
 
+All of this is **verified on a device**, not inferred from the build files:
+
+```
+navigator.xr         undefined
+navigator.usb        undefined
+navigator.hid        undefined
+window.NDEFReader    undefined
+navigator.bluetooth  object      <- kept, and gated
+navigator.serial     object      <- untouched, see below
+```
+
 | API | Cobalt | How |
 |---|---|---|
-| WebXR (`navigator.xr`) | **off** | `status: {"Android": ""}` |
-| WebUSB (`navigator.usb`) | **off** | `status: {"Android": ""}` |
+| WebXR (`navigator.xr`) | **off** | `kWebXr` disabled **+** `status: {"Android": ""}` |
+| WebUSB (`navigator.usb`) | **off** | `kWebUsb` disabled **+** `status: {"Android": ""}` |
 | Web NFC (`NDEFReader`) | **off** on Android | `status: {"Android": ""}` |
 | WebHID (`navigator.hid`) | off | **upstream already**, no patch |
-| Web Bluetooth (`navigator.bluetooth`) | **on, ASK by default** | upstream `BLUETOOTH_GUARD` |
+| Web Bluetooth (`navigator.bluetooth`) | **on, gated** | upstream `BLUETOOTH_GUARD` |
 | Web Serial (`navigator.serial`) | present — unresolved | see below |
 
 ## Measure, do not read the build files
@@ -46,13 +57,43 @@ declares it `{"Android": "", "default": "stable"}` and never enables it on
 Android. That is inherited, not caused, and args.gn's comment has been corrected
 rather than left looking like a Cobalt guarantee.
 
-## Why the status field rather than a flag
+## Two levers, and the one that actually counts
 
-WebXR, WebUSB and Web NFC are all declared `base_feature: "none"` in
-`runtime_enabled_features.json5`, so none of them has a `--disable-features`
-name and none is runtime-tunable. The status field is the only lever.
+`base_feature: "none"` in `runtime_enabled_features.json5` looks like it means
+no `--disable-features` name exists for these. **It does not**, and believing it
+cost a full build cycle.
 
-The value has to be an empty string **inside a platform map** —
+`content/child/runtime_features.cc:295` maps a **separately named** base::Feature
+onto the Blink feature:
+
+```c++
+{wf::EnableWebUSB, raw_ref(features::kWebUsb)},
+{wf::EnableWebXR,  raw_ref(features::kWebXr)},
+```
+
+Neither entry carries `kSetOnlyIfOverridden`, so content **unconditionally**
+overwrites whatever the json5 status set, using the defaults in
+`content/public/common/content_features.cc` — where both were
+`FEATURE_ENABLED_BY_DEFAULT`.
+
+Only a device probe could find this. Every static signal agreed the job was
+done: the patch applied, the series was green, the build succeeded through
+57,765 steps, the generated `runtime_enabled_features.cc` had
+`is_web_xr_enabled_ = false` inside the `IS_ANDROID` block, and
+`runtime_enabled_features.o` was recompiled against it. **The generated source
+was correct and the runtime overwrote it before the
+first page loaded.**
+
+Web NFC has neither a `runtime_features.cc` entry nor a base::Feature, which is
+exactly why it was the one that worked from the json5 change alone.
+
+So both levers are patched. **The json5 status is kept even where it is not
+sufficient on its own** — it is the correct declaration for the platform, and it
+becomes the operative one if a rebase ever adds `kSetOnlyIfOverridden` to those
+entries, which is the direction upstream has been moving. The failure it guards
+against is silent; the cost is two lines.
+
+The json5 value has to be an empty string **inside a platform map** —
 `{"Android": "", "default": "stable"}`. A bare `status: ""` is rejected by
 `json5_generator.py`, whose `_is_valid` accepts `""` only as a dict value. The
 first attempt used a bare one and the build died at step 1 of 23731 with
@@ -76,6 +117,14 @@ the source rather than assumed:
   `Type.BLUETOOTH_SCANNING` as user-visible categories, so it is reachable in
   Site settings rather than buried.
 - `requestDevice()` additionally requires a user gesture and shows a chooser.
+
+Confirmed at runtime on the device rather than only in the source:
+
+```
+navigator.bluetooth.getAvailability()        -> true
+navigator.bluetooth.requestDevice({...})     -> SecurityError:
+                                                Must be handling a user gesture
+```
 
 Adding a Cobalt-specific gate on top would replace a reviewed upstream mechanism
 with a worse one. The right work here, if any, is making sure Cobalt's own shell

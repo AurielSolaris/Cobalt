@@ -53,13 +53,39 @@ here would replace a reviewed upstream mechanism with a worse one.
 independently of the status field. Recorded in docs/device-apis.md as an open
 question rather than silently changed.
 
-## Why the status field and not a switch
+## Two levers, because the obvious one is not enough
 
-WebXR, WebUSB and Web NFC are all declared `base_feature: "none"`, so there is
-no `--disable-features` name for any of them. The status field is the only
-lever.
+`base_feature: "none"` in runtime_enabled_features.json5 looks like it means no
+`--disable-features` name exists. **It does not.** content maps a *separately
+named* base::Feature onto the Blink feature:
 
-The value has to be an empty string *inside a platform map* --
+    content/child/runtime_features.cc:295
+        {wf::EnableWebUSB, raw_ref(features::kWebUsb)},
+        {wf::EnableWebXR,  raw_ref(features::kWebXr)},
+
+Neither entry carries `kSetOnlyIfOverridden`, so content **unconditionally**
+overwrites whatever the json5 status set, from
+`content/public/common/content_features.cc`:
+
+    BASE_FEATURE(kWebUsb, "WebUSB", base::FEATURE_ENABLED_BY_DEFAULT);
+    BASE_FEATURE(kWebXr,  "WebXR",  base::FEATURE_ENABLED_BY_DEFAULT);
+
+This was found the only way it could have been. The json5 edit alone built
+cleanly through 57,765 steps, produced `is_web_xr_enabled_ = false` in the
+Android block of the generated code, installed -- and `navigator.xr` was still
+an object on the device. The generated source was right; the runtime overwrote
+it.
+
+Web NFC has neither a runtime_features.cc entry nor a base::Feature, so for it
+the json5 status really is the only lever, and it worked.
+
+**Both levers are applied, and the json5 one is kept even where it is not
+sufficient on its own.** It is the correct declaration for the platform, and it
+becomes the operative one if a rebase ever adds `kSetOnlyIfOverridden` to those
+entries -- upstream has been migrating toward that. The failure it guards
+against is silent, and the cost is two lines.
+
+The json5 value has to be an empty string *inside a platform map* --
 `{"Android": "", "default": "stable"}`. A bare `status: ""` is rejected by
 `json5_generator.py`, whose `_is_valid` accepts `""` only as a dict value; the
 first attempt here used a bare one and the build failed at step 1 of 23731,
@@ -155,6 +181,81 @@ EDITS = [
 ]
 
 
+# The operative lever for WebXR and WebUSB. content/child/runtime_features.cc
+# copies these onto the Blink features with no kSetOnlyIfOverridden, so whatever
+# they say wins over runtime_enabled_features.json5.
+CONTENT_FEATURES = "content/public/common/content_features.cc"
+
+CONTENT_EDITS = [
+    (
+        "kWebUsb",
+        '''// Controls whether the WebUSB API is enabled:
+// https://wicg.github.io/webusb
+BASE_FEATURE(kWebUsb, "WebUSB", base::FEATURE_ENABLED_BY_DEFAULT);
+''',
+        '''// Controls whether the WebUSB API is enabled:
+// https://wicg.github.io/webusb
+//
+// Cobalt does not ship WebUSB (see
+// tools/patches/cobalt-disable-device-apis.py). This is the lever that counts:
+// runtime_features.cc copies this onto the Blink feature with no
+// kSetOnlyIfOverridden, so it overwrites the runtime_enabled_features.json5
+// status either way.
+BASE_FEATURE(kWebUsb, "WebUSB", base::FEATURE_DISABLED_BY_DEFAULT);
+''',
+    ),
+    (
+        "kWebXr",
+        '''// Controls whether the WebXR Device API is enabled.
+BASE_FEATURE(kWebXr, "WebXR", base::FEATURE_ENABLED_BY_DEFAULT);
+''',
+        '''// Controls whether the WebXR Device API is enabled.
+//
+// Cobalt does not ship WebXR. args.gn already sets enable_vr, enable_openxr,
+// enable_arcore and enable_cardboard false, which removes the device backends;
+// this removes the API. runtime_features.cc copies this onto the Blink feature
+// unconditionally, so the json5 status alone did not survive to runtime.
+BASE_FEATURE(kWebXr, "WebXR", base::FEATURE_DISABLED_BY_DEFAULT);
+''',
+    ),
+]
+
+
+def patch_content_features() -> int:
+    """Flip kWebUsb and kWebXr off. Returns the number of failures."""
+    path = SRC / CONTENT_FEATURES
+    if not path.exists():
+        print(f"  {'content_features.cc':<12} FAILED  missing {CONTENT_FEATURES}",
+              file=sys.stderr)
+        return 1
+
+    text = path.read_text(encoding="utf-8")
+    failures = 0
+    changed = False
+
+    for label, old, new in CONTENT_EDITS:
+        if new.split("\n")[-2] in text:
+            print(f"  {label:<12} already applied")
+            continue
+        if old not in text:
+            print(f"  {label:<12} FAILED  anchor not found in {CONTENT_FEATURES}",
+                  file=sys.stderr)
+            failures += 1
+            continue
+        if text.count(old) != 1:
+            print(f"  {label:<12} FAILED  anchor matches {text.count(old)}x",
+                  file=sys.stderr)
+            failures += 1
+            continue
+        text = text.replace(old, new, 1)
+        changed = True
+        print(f"  {label:<12} patched")
+
+    if changed and not failures:
+        path.write_bytes(text.replace("\r\n", "\n").encode("utf-8"))
+    return failures
+
+
 def main() -> int:
     path = SRC / REL
     if not path.exists():
@@ -190,6 +291,14 @@ def main() -> int:
     if changed:
         # Chromium sources are LF; writing CRLF from Windows breaks the build.
         path.write_bytes(text.replace("\r\n", "\n").encode("utf-8"))
+
+    # The second lever. Without this, WebXR and WebUSB come back at runtime no
+    # matter what the json5 above says -- verified on a device, not assumed.
+    failures += patch_content_features()
+    if failures:
+        print(f"\n{failures} edit(s) failed; tree is partially patched",
+              file=sys.stderr)
+        return 1
 
     print("\nnavigator.xr, navigator.usb and NDEFReader are gone. WebHID needed "
           "nothing (upstream leaves it off on Android); Web Bluetooth stays and "
