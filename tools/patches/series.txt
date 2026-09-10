@@ -94,6 +94,12 @@ note ===== Google Play Services removal (decision 0013) =====
 # modules from the APK. See docs/gms-removal.md.
 tool patches/cobalt-gms-shape-detection.py $SRC
 
+# Geolocation keeps working through android.location.LocationManager, which is
+# what upstream already falls back to without Play Services. Drops the fused
+# provider. Note Chromium never runs the googleapis.com/geolocation network
+# path on Android -- it is in the non-Android branch of the BUILD.gn.
+tool patches/cobalt-gms-geolocation.py $SRC
+
 note ===== Bundled extensions =====
 
 # Stages the signed uBO CRX into the APK and configures the policy that makes

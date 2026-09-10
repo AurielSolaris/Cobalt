@@ -105,7 +105,7 @@ of code: the patch itself comes from upstream, adapted to M140.
 ([decision 0013](docs/decisions/0013-remove-google-play-services.md)), and it is
 a release gate. Progress is a number anyone can produce —
 `tools/build/gms-inventory.sh` reads the shipped APK's real dependency graph —
-and it currently reads **14 modules, down from 18**. See
+and it currently reads **14 modules and 43 first-party edges, down from 18 and 49**. Shape detection and geolocation are done. See
 [`docs/gms-removal.md`](docs/gms-removal.md).
 
 **WebXR, WebUSB and Web NFC are off.** Each hands a web page access to hardware

@@ -45,7 +45,7 @@ free. So the work is 13 modules, not 18.
 | | Then | Now |
 |---|---:|---:|
 | Modules | 18 | **14** |
-| First-party edges | 49 | **47** |
+| First-party edges | 49 | **43** |
 
 ## The method
 
@@ -100,7 +100,7 @@ specified as GMS-free ([0015](decisions/0015-passwords-local-store-and-system-au
 and doing it first would mean building on a layer about to change underneath it.
 
 1. ~~`services/shape_detection` — vision, vision_common~~ **done**
-2. `services/device/geolocation` — location, tasks, base, basement
+2. ~~`services/device/geolocation` — location, tasks, base, basement~~ **done**
 3. `components/media_router` — cast, cast_framework (0013: casting is dropped)
 4. `components/gcm_driver`, `components/signin`, `components/externalauth`,
    `components/module_installer`, `components/webauthn`, `components/omnibox`
@@ -140,7 +140,7 @@ and Chromium-only; the Shape Detection API never became a web standard.
 the last thing keeping the modules in the APK. Removing it does not jump 0014's
 queue, because it changes no Java.
 
-### Left broken on purpose
+### Left broken on purpose (shape_detection)
 
 `services_javatests` and `services_junit_tests` still list
 `BarcodeDetectionImplTest`, `TextDetectionImplTest` and `BitmapUtilsTest`, which
@@ -150,3 +150,77 @@ testonly, not in `chrome_public_apk`, and Cobalt does not build them.
 One real loss inside that: `FaceDetectionImplTest` is the only coverage of
 `FaceDetectionImpl`, the AOSP path Cobalt now depends on exclusively. Worth
 restoring if the test targets are ever brought back.
+
+## 2. `services/device/geolocation` — done
+
+Applied by `tools/patches/cobalt-gms-geolocation.py`, in the series.
+**Edges 47 → 43**; modules stay at 14, because `location` and `tasks` keep
+referrers in `components/omnibox` and `chrome/browser/ui/android/omnibox`.
+
+Same shape as shape_detection. `LocationProviderFactory.create()` already chose
+between `LocationProviderGmsCore` (the fused provider) and
+`LocationProviderAndroid` (`android.location.LocationManager`, plain AOSP) on
+`ChromiumPlayServicesAvailability`, with a second gate above it —
+`use_gms_core_location_provider`, threaded from
+`ContentBrowserClient::ShouldUseGmsCoreGeolocationProvider()`. The GMS branch is
+deleted and the AOSP one is now unconditional.
+
+### The Google endpoint that turned out not to be there
+
+`network_location_request.cc` posts WiFi and cell observations to
+`https://www.googleapis.com/geolocation/v1/geolocate` — exactly the Google
+*service* vs GMS *library* call 0013 has to make for Safe Browsing.
+
+**It does not apply.** `network_location_provider.cc` and
+`wifi_data_provider_common.cc` sit in the `else` branch of the BUILD.gn, not
+`is_android`. Chromium on Android delegates entirely to the platform and never
+runs that path. Checked rather than assumed, because the opposite would have
+been a much bigger finding.
+
+### Two things the build caught that reading the Java did not
+
+Removing `useGmsCoreLocationProvider()` left `LocationProviderFactory` with no
+`@CalledByNative` methods at all, and `jni_zero` refuses such a file outright:
+
+```
+No native methods found in .../LocationProviderFactory.java
+```
+
+So the class also had to leave `generate_jni("geolocation_jni_headers")`.
+`LocationProviderAdapter` still has natives and stays; nothing includes the
+generated `LocationProviderFactory_jni.h` any more, because
+`geolocation_provider_impl.cc` held the only reference and this patch removed
+it. The unused `CalledByNative` and `ContextUtils` imports had to go too — an
+unused import is an error under Chromium's Java checks.
+
+Both surfaced as hard failures at step ~330 of 86,709, which is the argument for
+every series step asserting.
+
+### Verified on device
+
+The dex check is inconclusive here — R8 minifies these class names — so the
+verification is behavioural. With `enableHighAccuracy: true`,
+`dumpsys location` shows Cobalt itself driving the GPS provider:
+
+```
+gps provider:
+  service: ProviderRequest[@0, HIGH_ACCURACY, WorkSource{10670 app.auriel.cobalt}]
+  mStarted=true   (changed +5s355ms ago)
+```
+
+That is `navigator.geolocation` → `LocationProviderAndroid` → `LocationManager`
+→ GPS, with no Play Services anywhere in it.
+
+The request still timed out, and **that is the OS, not Cobalt**. The test device
+has no `network` location provider at all — only `passive`, `fused` and `gps` —
+so a coarse request (`enableHighAccuracy: false`) has nothing to service it and
+a fine one needs a satellite fix. Which is the caveat worth repeating: removing
+GMS from Cobalt removes *Cobalt's* dependency, not the device's. What
+`LocationManager` resolves to is the operating system's business, and a
+de-Googled OS with no network location backend gives Cobalt GPS or nothing.
+
+### Left broken on purpose (geolocation)
+
+`LocationProviderTest.java` (junit) references `LocationProviderGmsCore` and no
+longer compiles. Testonly, not in `chrome_public_apk`, not built by Cobalt —
+same call as shape_detection's.
