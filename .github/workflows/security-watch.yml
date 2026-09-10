@@ -1,0 +1,82 @@
+name: Security watch
+
+# Cobalt is pinned to Chromium 140 and backports security fixes rather than
+# rebasing (decision 0016). That only works if someone notices what to backport,
+# and 0016 names that as the strategy's load-bearing risk. Decision 0017's answer
+# is corroboration across Chromium forks plus upstream's own record; this is that
+# answer running on a schedule instead of relying on anyone remembering.
+#
+# It files issues. It never touches code, and it decides nothing.
+
+on:
+  schedule:
+    # 07:00 UTC daily. Chrome Releases posts land during US working hours, so a
+    # morning-after run catches a release without waiting a full cycle.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'How many days back to read forks and releases'
+        required: false
+        default: '14'
+      max_issues:
+        description: 'Cap issues filed in one run; the rest wait for the next'
+        required: false
+        default: '25'
+      dry_run:
+        description: 'Print what would be filed instead of filing it'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # Two runs filing at once would race on the "is this CVE already tracked?"
+  # check and file duplicates.
+  group: security-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Corroborate and triage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Ensure labels exist
+        # `gh issue create --label` fails outright on a label that does not
+        # exist, which would turn a missing label into a silent no-issue run.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          create() {
+            gh label create "$1" --color "$2" --description "$3" 2>/dev/null \
+              || echo "  label exists: $1"
+          }
+          create security          "d73a4a" "Security fix or advisory"
+          create needs-triage      "fbca04" "Nobody has assessed this yet"
+          create source:upstream   "0e8a16" "Found in Chromium's own release record"
+          create source:vanadium   "1d76db" "Found in GrapheneOS/Vanadium"
+          create source:cromite    "1d76db" "Found in uazo/cromite"
+          create source:brave      "1d76db" "Found in brave/brave-core"
+
+      - name: Watch forks and upstream
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python tools/security/watch-security-patches.py \
+            --days "${{ github.event.inputs.days || '14' }}" \
+            --max-issues "${{ github.event.inputs.max_issues || '25' }}" \
+            ${{ github.event.inputs.dry_run == 'true' && ' ' || '--file' }}
