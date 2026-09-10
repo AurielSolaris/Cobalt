@@ -45,7 +45,7 @@ free. So the work is 13 modules, not 18.
 | | Then | Now |
 |---|---:|---:|
 | Modules | 18 | **14** |
-| First-party edges | 49 | **43** |
+| First-party edges | 49 | **38** |
 
 ## The method
 
@@ -101,7 +101,8 @@ and doing it first would mean building on a layer about to change underneath it.
 
 1. ~~`services/shape_detection` — vision, vision_common~~ **done**
 2. ~~`services/device/geolocation` — location, tasks, base, basement~~ **done**
-3. `components/media_router` — cast, cast_framework (0013: casting is dropped)
+3. `components/media_router` — cast, cast_framework (0013: casting is dropped).
+   **Bigger than it looks — see below.**
 4. `components/gcm_driver`, `components/signin`, `components/externalauth`,
    `components/module_installer`, `components/webauthn`, `components/omnibox`
 5. `content/public/android` — auth_api_phone, base, basement, tasks
@@ -224,3 +225,65 @@ de-Googled OS with no network location backend gives Cobalt GPS or nothing.
 `LocationProviderTest.java` (junit) references `LocationProviderGmsCore` and no
 longer compiles. Testonly, not in `chrome_public_apk`, not built by Cobalt —
 same call as shape_detection's.
+
+## 3. `chrome_java`'s dead dependency lines — done
+
+Applied by `tools/patches/cobalt-gms-chrome-java-dead-deps.py`.
+**Edges 43 → 38**, no Java changes at all.
+
+`chrome_java` declared eight GMS modules. Its own sources import three:
+
+```
+gms.cast   0 files      gms.gcm     3 files
+gms.iid    0 files      gms.common  1 file
+gms.auth   0 files
+gms.tasks  0 files
+```
+
+Grep alone is not proof — a Java target legitimately needs a dependency it never
+imports when a library it *uses* exposes those types in its public API, and
+that is a plausible reason for exactly these five. So it was tested:
+`auth_base`, `cast`, `cast_framework`, `iid` and `tasks` were removed and
+`chrome_java` rebuilt clean.
+
+`base`, `basement` and `gcm` stay. Those imports are real, and removing them is
+0013's unanswered Web Push question rather than a tidy-up.
+
+The module count does not move: all five keep referrers elsewhere. This removes
+five of the edges holding them in, which is what has to happen first.
+
+## 4. `components/media_router` — surveyed, not attempted
+
+Casting is dropped by 0013, so this looked like the next clean cut. It is not,
+and the reason is worth recording before someone picks it up expecting an
+afternoon.
+
+**There is no `enable_media_router` GN flag** in M140 — searched the whole tree.
+Media Router is unconditional, so there is no supported "build without casting".
+
+The Java splits into a framework layer and a Cast Application Framework layer:
+
+```
+org/chromium/components/media_router/*.java        23 files, the framework
+org/chromium/components/media_router/caf/**        17 files, all GMS
+```
+
+`BrowserMediaRouter.addProviders()` has the same clean shape as shape detection
+and geolocation — it checks `GoogleApiAvailability` and, without Play Services,
+**registers no providers at all**. So the entry point is a one-line change.
+
+What breaks the pattern is that **three framework files are Cast-typed too**:
+`MediaSink` holds a `gms.cast.CastDevice`, `MediaStatusBridge` is explicitly "a
+wrapper layer that exposes a gms.cast.MediaStatus to native code", and both are
+referenced across the framework — `MediaRouteManager`, `DiscoveryDelegate`,
+`FlingingControllerBridge`, the dialog managers. Deleting `caf/` is not enough;
+the framework has GMS types in its own vocabulary.
+
+And `//components/media_router/browser/android:java` is pulled by
+`chrome/android:chrome_java`, so the fallout lands in the layer
+[0014](decisions/0014-gms-removal-before-shell.md) defers to last.
+
+**Not a quick win.** It is either a genuine refactor of the framework layer to
+drop Cast types, or a removal that reaches into `chrome/android` — and the
+second is better done when `chrome/android` comes up in the order anyway,
+possibly alongside the shell that replaces much of it.

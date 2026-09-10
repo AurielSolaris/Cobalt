@@ -100,6 +100,11 @@ tool patches/cobalt-gms-shape-detection.py $SRC
 # path on Android -- it is in the non-Android branch of the BUILD.gn.
 tool patches/cobalt-gms-geolocation.py $SRC
 
+# chrome_java listed eight GMS modules and imports three. The other five were
+# removed and chrome_java rebuilt to prove it -- a Java target can legitimately
+# need a dep it never imports. Edges 43 -> 38, no Java changes.
+tool patches/cobalt-gms-chrome-java-dead-deps.py $SRC
+
 note ===== Bundled extensions =====
 
 # Stages the signed uBO CRX into the APK and configures the policy that makes
