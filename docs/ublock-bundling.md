@@ -195,14 +195,70 @@ The blocking result is the one that matters: it proves MV2 `webRequestBlocking`
 with a persistent background page works on Android, which is the reason Cobalt
 exists.
 
+### Not a bug: unlimitedStorage already works
+
+This document previously claimed `unlimitedStorage` was excluded from
+`desktop_android` the same way `webNavigation` was. **That was an expectation,
+not a measurement, and it was wrong.** Unlike `webNavigation`, the permission
+carries no `platforms` key at all in `_permission_features.json`, so it is
+available everywhere, and both halves of the implementation are already
+compiled into the Android build.
+
+Measured on device rather than reasoned about, because that is what the
+webNavigation and policy-provider mistakes both cost. See
+[`tools/device/check-unlimited-storage.py`](../tools/device/check-unlimited-storage.py),
+which re-runs every number below.
+
+**The quota system** (`ExtensionSpecialStoragePolicy` → `QuotaManagerImpl`),
+covering IndexedDB, Cache API and the rest:
+
+| Origin | `navigator.storage.estimate().quota` | Which path |
+|---|---:|---|
+| `https://example.com` | 72,061,068,902 | 60% of a 120 GB disk — the shared pool |
+| `chrome-extension://fimbmj…` | 94,801,749,772 | free space + usage — the unlimited path |
+
+`chrome://quota-internals` agrees and is the clearer statement of it, because it
+splits the total by bucket:
+
+```
+Total Storage Usage:  13654207 B (13654207 B for unlimited origins)
+```
+
+Every byte uBO owns is accounted to the unlimited bucket.
+
+**The settings store** (`LocalValueStoreCache` →
+`WeakUnlimitedSettingsStorage`), which is a separate mechanism covering
+`chrome.storage.local`:
+
+```
+QUOTA_BYTES  10,485,760      the documented limit
+in use       21,599,453      already more than double it
+wrote        11,534,336      one MB past the limit on its own
+lastError    null            accepted, quota enforcer bypassed
+```
+
+So no patch, no series entry, and nothing to port. The gating asymmetry that
+caught `browserAction` and `webNavigation` simply is not present here.
+
 ## Still open
 
-- **`unlimitedStorage`** is excluded from `desktop_android` the same way
-  `webNavigation` was. uBO declares it, and runs without it, but its storage is
-  then subject to the ordinary quota. Not yet looked at; expected to be much
-  cheaper than webNavigation.
 - **Refreshing the bundled version** is a release-checklist item
   ([decision 0006](decisions/0006-bundle-ublock-origin.md)), not something to
   notice later.
 - **The update endpoint** at `updates.cobalt.auriel` does not exist yet. Nothing
   fetches it today, by design, but it is now a named future dependency.
+- **uBO can end up `TERMINATED` and stay there.** Observed while measuring the
+  above: after opening several tabs in quick succession, the extension process
+  was killed and `developerPrivate.getExtensionsInfo` reported
+  `state: "TERMINATED"` with no recovery. In that state the extension is inert
+  — the quota numbers dropped straight back to the shared pool, which is how it
+  was noticed — and Cobalt's UI says nothing about it. Chrome desktop surfaces
+  a reload prompt for this; Cobalt does not, and MV2 background pages are not
+  restarted automatically the way MV3 service workers are.
+
+  This matters more than it would on a desktop: the target hardware is 4 GB and
+  two cores ([decision 0004](decisions/0004-performance-budget.md)), so process
+  kills are the expected case, and a content blocker that silently stops
+  blocking is the worst failure mode this browser has. Not yet diagnosed — how
+  often it happens, and whether the right fix is auto-reload or a visible
+  prompt, is unmeasured.

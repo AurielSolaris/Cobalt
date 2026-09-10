@@ -114,6 +114,19 @@ success:
   writes `/opt/cobalt/build.start` before starting; completion means the APK is
   *newer than that stamp*, never merely present.
 
+There are two scripts for checking the result rather than assuming it:
+
+| Script | Answers |
+|---|---|
+| `tools/device/verify-apk.sh` | is the APK real, freshly built, and does it carry the assets it should |
+| `tools/device/check-unlimited-storage.py` | does the bundled extension actually get `unlimitedStorage` on the device, on both of the two mechanisms that honour it |
+
+The second one exists because reading GN files got that question wrong twice in
+a row — first predicting a gate that is not there, then measuring an extension
+that had been terminated, which looks identical to having no permission at all.
+Build files tell you what is compiled, not what happens. It needs `adb`, a
+running Cobalt, and `python3 -m pip install websocket-client`.
+
 ## Known gaps
 
 - The series is verified idempotent against **our** tree. It has not been run
