@@ -95,6 +95,26 @@ yet understood is how the `browserAction` and policy-provider bugs happened.
 really is reachable from a page on Android, it belongs in the table above with
 the others.
 
+## The generated code is the check, not the source
+
+The json5 change lands in `out/Default/gen/third_party/blink/renderer/platform/runtime_enabled_features.cc`,
+which carries one block of initialisers **per platform**. The Android block is
+the first one, and after this patch it reads:
+
+```c++
+bool RuntimeEnabledFeaturesBase::is_web_hid_enabled_ = false;
+bool RuntimeEnabledFeaturesBase::is_web_nfc_enabled_ = false;
+bool RuntimeEnabledFeaturesBase::is_web_usb_enabled_ = false;
+bool RuntimeEnabledFeaturesBase::is_web_xr_enabled_  = false;
+```
+
+Check that file, not the header — the header holds only accessors
+(`return is_web_xr_enabled_;`) and does not change when a status does, so its
+timestamp is a misleading signal.
+
+`navigator.xr` is `[RuntimeEnabled=WebXR]` and `navigator.usb` is
+`[RuntimeEnabled=WebUSB]` in their IDL, so those booleans are exactly the gate.
+
 ## Verifying
 
 The same CDP method as

@@ -114,6 +114,28 @@ success:
   writes `/opt/cobalt/build.start` before starting; completion means the APK is
   *newer than that stamp*, never merely present.
 
+- **siso's `.siso_fs_state` can go stale, and a stale one turns builds into
+  no-ops that report success.** After editing
+  `runtime_enabled_features.json5`, three consecutive builds reported
+  `Build Succeeded` — one of them "27 steps" — while the generated
+  `runtime_enabled_features.cc` was never recompiled into the APK. Asking for
+  the generated file by name still returned `ninja: no work to do`, and `gn
+  refs` confirmed the dependency was real, so the graph was right and the cache
+  was wrong. Deleting `out/Default/.siso_fs_state` fixed it: the next build
+  planned **80,306 steps** instead of zero.
+
+  So: if a source change produces a suspiciously small build, or the artifact
+  does not behave as the source says it should, **suspect the cache before
+  suspecting the patch.** Removing that file is safe — it is a cache, and the
+  next build rebuilds it.
+
+  Two related habits: do not mix plain `ninja` with `siso` in the same out dir
+  (`ninja` rewrites the build log and siso then re-plans from scratch), and do
+  not edit a shell script on `/mnt/c` while WSL is executing it — bash reads
+  scripts incrementally, and a rewrite mid-run produced
+  `unexpected EOF while looking for matching '"'` from a file that was
+  syntactically fine by the time it was checked.
+
 There are two scripts for checking the result rather than assuming it:
 
 | Script | Answers |
