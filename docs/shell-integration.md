@@ -141,11 +141,54 @@ classes are unreachable from any given embedder and R8 in the consuming app
 shrinks accordingly — but that is an expectation, not a measurement, and it
 should be measured once the app actually links against it.
 
-**Java only, deliberately.** No native libraries and no assets: `libchrome.so`
-is 205 MB and the paks another 70 MB, and bundling them would have made every
-failure a twenty-minute failure while answering nothing about the question that
-was actually open. Adding them is mechanical — `cast_browser_dist_aar` sets
-`native_libraries` and an assets dep — and is the next step.
+### Then the native library, and one thing that does not work
+
+Adding `native_libraries = [ "$root_build_dir/libchrome.so" ]` takes the
+artifact from 55.3 MB to **260.3 MB**, in 24 seconds. `jni/arm64-v8a/libchrome.so`
+is in it, all 205 MB.
+
+**Assets do not come through, and cannot.** Adding
+`chrome_apk_pak_assets`, `chrome_apk_locale_pak_assets` and
+`chrome_public_non_pak_assets` to `deps` builds them and then discards them —
+measured, `assets/` count **zero**. The reason is in
+`build/android/gyp/dist_aar.py`, which takes
+
+```
+--jars  --dependencies-res-zips  --r-text-files
+--proguard-configs  --native-libraries  --abi
+```
+
+and **has no assets argument of any kind**. The template's doc comment lists
+`assets/` because that is what an `.aar` may contain in general, not because
+this template writes any.
+
+So the `.pak` bundles, ICU data and the bundled uBlock Origin CRX have to reach
+the app by another route. Cheapest is copying them out of the Chromium build
+into `modules/app/src/main/assets/` as a build step — no Chromium patch, and
+the paths the engine looks for are unchanged. Patching `dist_aar.py` to support
+assets would be tidier and is a change to a shared script for one consumer's
+benefit.
+
+### The mismatch this exposes, which is the real finding
+
+`libchrome.so` is built for `chrome_public_apk`, and its JNI registration is
+generated from *that* APK's Java — `chrome/android`'s, which this AAR
+deliberately does not carry. **A native library whose registration references
+Java classes that are not present is a startup problem, not a packaging one**,
+and it will not appear until something calls `BrowserStartupController`.
+
+Two ways out, and the choice has not been made:
+
+1. **Ship `chrome/android`'s Java in the AAR too.** Straightforward, and it
+   undoes the "zero Chrome classes" result — Cobalt would carry Chrome's
+   interface without using it and lean on R8 to strip it.
+2. **Give Cobalt its own `shared_library` target**, with Chrome's browser layer
+   but JNI registration generated from the Java Cobalt actually ships. More
+   work, and the honest shape.
+
+"Just use content_shell's library" is not an option: Cobalt needs Chrome's
+browser layer rather than bare content, because extensions live there and
+extensions are why Cobalt exists.
 
 ## Closed: Compose draws over the content surface
 
@@ -180,10 +223,11 @@ should behave identically.
 Everything above is a dependency-graph result. These are not, and each needs a
 spike of its own before anything is committed to:
 
-- **Native libraries and assets in the AAR.** The Java half is done (below);
-  `libchrome.so` is 205 MB and the pak/ICU assets another 70 MB, and how a
-  Gradle consumer handles those is untested. `cast_browser_dist_aar` shows the
-  mechanism.
+- **Which native library Cobalt links against** — see the JNI mismatch below.
+  This is now the largest open question in the shell work.
+- **How the runtime assets reach the app**, since `dist_aar` cannot carry them.
+- **Whether a 260 MB AAR is workable for Gradle at all** — untested, and a real
+  risk: the Java half alone is 55 MB before R8.
 - **Browser process startup from a Gradle app.** `BrowserStartupController`
   needs the native library loaded and the command line initialised, which
   `ChromeBrowserInitializer` does in `chrome/android` — the layer Cobalt is not
@@ -203,17 +247,22 @@ spike of its own before anything is committed to:
 
 1. ~~**Compose + SurfaceView spike.**~~ **Done** — Compose draws over it.
 2. ~~**A content `dist_aar`.**~~ **Done** — builds, 55.3 MB, no Chrome UI in it.
-3. **The AAR with native libraries and assets**, consumed by `modules/app`: one
-   hardcoded URL, no tabs, no chrome. This is where browser-process startup
-   gets solved.
-4. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch,
+3. ~~**The AAR with native libraries.**~~ **Done** — 260 MB, and it surfaced
+   two things: assets cannot travel in an AAR, and `libchrome.so`'s JNI
+   registration expects Java this AAR does not carry.
+4. **Resolve the JNI mismatch** — pick between shipping Chrome's Java and
+   building Cobalt's own `shared_library`. Nothing else can be wired until this
+   is settled.
+5. **`modules/app` consuming the AAR**: one hardcoded URL, no tabs, no chrome.
+   Where browser-process startup gets solved.
+6. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch,
    behind the `BrowserEngine` seam in `modules/app/.../browser/engine/`, which
    `DocumentEngine` already implements for the 0.1.0 pipeline.
-5. **Bottom bar wired to it** — the four sections from 0002, with the address
+7. **Bottom bar wired to it** — the four sections from 0002, with the address
    bar and `NavigationController`.
-6. **The surfaces that are not content**: extensions (a WebUI navigation),
+8. **The surfaces that are not content**: extensions (a WebUI navigation),
    downloads, settings.
-7. **Incognito.**
+9. **Incognito.**
 
 None of this blocks [gate 2](gms-removal.md), and gate 2 should still land first
 — 0014's ordering holds, and this document does not change it. It exists so the

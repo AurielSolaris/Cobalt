@@ -26,26 +26,53 @@ manifest into one `.aar`.
 `embedder_support:content_view_java` for `ContentView` and
 `ContentViewRenderView`.
 
-**It carries no native libraries and no assets**, and that is the point of doing
-it this way first. `libchrome.so` is 205 MB and the pak/ICU assets are another
-70 MB; bundling them in would make every failure a twenty-minute failure and
-tell us nothing extra. What is genuinely unknown is the *Java* side: whether
-`dist_aar` copes with this dependency closure at all, and how much of Chromium
-comes along uninvited. That is answerable in one build over Java that is already
-compiled.
+The first version was **Java only**, to learn cheaply whether `dist_aar` coped
+with the dependency closure at all and how much of Chromium came along
+uninvited. It did, in 21 seconds, at 55.3 MB and 22,364 classes with **zero**
+`org/chromium/chrome/` classes — the seam is in the right place.
 
-Adding `native_libraries` and `asset_deps` is mechanical once this works —
-`cast_browser_dist_aar` shows exactly how — and is the next step rather than
-this one.
+It now also carries `libchrome.so`, at 205 MB, which takes the artifact to
+**260 MB**.
+
+**It does not carry the runtime assets, and it cannot.** `dist_aar` has no
+mechanism for them: `build/android/gyp/dist_aar.py` accepts `--jars`,
+`--dependencies-res-zips`, `--r-text-files`, `--proguard-configs` and
+`--native-libraries`, and nothing else. Adding asset targets to `deps` builds
+them and discards them — measured, `assets/` count zero. The template's doc
+comment lists `assets/` because that is what an `.aar` may contain in general,
+not because this template writes any.
+
+So the `.pak` bundles, ICU data and the bundled uBO CRX have to reach the app by
+another route, and that is now a known piece of work rather than an assumption.
+
+## The mismatch this is expected to expose
+
+`libchrome.so` is built for `chrome_public_apk`, and its JNI registration is
+generated from *that* APK's Java — `chrome/android`'s, which this AAR
+deliberately does not carry. A native library whose registration references Java
+classes that are not present is not a packaging problem, it is a startup
+problem, and it will not show up until something calls
+`BrowserStartupController`.
+
+So this step is expected to produce a **working artifact and an open question**,
+and the question is the interesting part:
+
+1. **Ship `chrome/android`'s Java in the AAR too.** Straightforward, and it
+   undoes the "zero Chrome classes" result — Cobalt would carry Chrome's
+   interface without using it and rely on R8 to strip it.
+2. **Give Cobalt its own `shared_library` target**, with Chrome's browser layer
+   but registration generated from the Java Cobalt actually ships. More work,
+   and the honest shape.
+
+Cobalt needs Chrome's browser layer rather than bare content — extensions live
+there, and extensions are why Cobalt exists — so "just use content_shell's
+library" is not an option.
 
 ## What to look at when it builds
 
     ls -la out/Default/apks/cobalt_content.aar
     unzip -l out/Default/apks/cobalt_content.aar | tail -5
-
-The size and the class count are the answer. A closure that drags in most of
-`chrome/android` would mean the seam is in the wrong place and the AAR should be
-cut lower.
+    unzip -l out/Default/apks/cobalt_content.aar | grep -E "jni/|assets/" | head
 
 Idempotent; the edit asserts.
 """
@@ -73,7 +100,13 @@ TARGET = '''
 # native_libraries and asset_deps are mechanical afterwards -- see
 # chromecast/BUILD.gn's cast_browser_dist_aar.
 dist_aar("cobalt_content_dist_aar") {
+  # The engine itself. 205 MB, and the reason the APK is what it is.
+  native_libraries = [ "$root_build_dir/libchrome.so" ]
+
   deps = [
+    # The engine's native half has to be built before it can be packaged.
+    "//chrome/android:libchrome",
+
     # The embedding surface: WebContents, NavigationController,
     # BrowserStartupController.
     "//content/public/android:content_full_java",
@@ -81,6 +114,15 @@ dist_aar("cobalt_content_dist_aar") {
     # ContentView and ContentViewRenderView -- the SurfaceView that
     # modules/app/.../content/ContentSurface.kt already stands in for.
     "//components/embedder_support/android:content_view_java",
+
+    # NOTE: the runtime assets -- .pak bundles, ICU data, the bundled uBlock
+    # Origin CRX -- are deliberately NOT listed here, because listing them does
+    # nothing. dist_aar cannot package assets: build/android/gyp/dist_aar.py
+    # takes --jars, --dependencies-res-zips, --r-text-files, --proguard-configs
+    # and --native-libraries, and has no assets argument of any kind. Adding
+    # asset targets to deps builds them and drops them on the floor.
+    #
+    # They have to reach the app another way. See docs/shell-integration.md.
   ]
 
   output = "$root_build_dir/apks/cobalt_content.aar"
