@@ -93,37 +93,36 @@ def edit(rel: str, pairs, *, done_marker: str) -> str:
 
 
 def patch_language() -> str:
-    return edit(
-        "chrome/browser/language/android/BUILD.gn",
-        [(TASKS_DEP,
-          "    # Cobalt: the tasks AAR was listed and nothing here imports\n"
-          "    # com.google.android.gms at all. Verified by removing it and\n"
-          "    # building the target. Decision 0013.\n")],
-        done_marker="the tasks AAR was listed and nothing here imports")
+    """Not removed. Kept as a record of a wrong answer.
+
+    `chrome/browser/language/android` lists the tasks AAR and nothing under it
+    imports `com.google.android.gms`, so it looked dead -- the same reasoning
+    that was right for chrome_java's five.
+
+    It is not dead. The dep is needed on the *direct classpath* because code
+    there touches a type from a library that exposes `gms.tasks` in its own API,
+    and Chromium's `check_for_missing_direct_deps` enforces exactly that. The
+    removal broke `chrome_public_apk`.
+
+    Worse, it broke it invisibly: the affected `__validate` steps were already
+    up to date, so the build that "verified" the removal never re-ran them. A
+    green build that did not check the thing is this project's recurring
+    failure, and grep-plus-a-build is not sufficient evidence for a dep removal
+    unless the build actually rebuilds that target's validation.
+    """
+    return "skipped (not dead -- see docstring)"
 
 
 # ---------------------------------------------------------- 2. module_installer
 
 
 def patch_module_installer() -> str:
-    """Only the junit test imports GMS; the library dep is dead.
+    """Not removed either, for the same reason as [patch_language].
 
-    The junit target keeps its own dependency: Cobalt does not build it, and
-    editing a test target to remove a dep its own source still imports would
-    break it for no shipped benefit.
+    Only the junit test imports GMS here, which made the library's own dep look
+    dead. `check_for_missing_direct_deps` disagrees, and it is right.
     """
-    # The dep line appears twice in this file -- once in the library, once in
-    # the junit binary -- so anchor on the library's neighbours, which are not.
-    neighbours = ('    "//base:base_java",\n'
-                  '    "//components/crash/android:java",\n')
-    return edit(
-        "components/module_installer/android/BUILD.gn",
-        [(TASKS_DEP + neighbours,
-          "    # Cobalt: dead in this library -- only the junit test below\n"
-          "    # imports com.google.android.gms. Verified by removing it and\n"
-          "    # building module_installer_java. Decision 0013.\n"
-          + neighbours)],
-        done_marker="dead in this library")
+    return "skipped (not dead -- see patch_language)"
 
 
 # ---------------------------------------------------------------------- 3. omaha

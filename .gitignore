@@ -43,4 +43,4 @@ __pycache__/
 # The AAR is ~260 MB and the assets ~70 MB, and both are reproducible from the
 # Chromium checkout in under a minute. A git repository is not a binary cache.
 modules/app/libs/
-modules/app/src/chromium/assets/
+modules/app/src/chromium/

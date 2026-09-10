@@ -89,6 +89,10 @@ REL = "chrome/android/BUILD.gn"
 
 MARKER = "cobalt_content_dist_aar"
 
+# The first line of Cobalt's appended block, and the handle used to find it
+# again so the block can be rewritten in place. Must match TARGET's opening.
+BANNER = "# Cobalt: the content layer, packaged for a Gradle consumer."
+
 TARGET = '''
 # ---------------------------------------------------------------------------
 # Cobalt: the content layer, packaged for a Gradle consumer.
@@ -129,6 +133,23 @@ TARGET = '''
 # So the second library is gone rather than kept: it doubled a 205 MB link for
 # no measured benefit. If the startup test does find a real mismatch, this is
 # where the fix goes, and the removed target is in git history.
+# NOTE: the JNI registration is NOT here, and cannot be.
+#
+# jni_zero generates org.jni_zero.GEN_JNI and J.N -- the classes libchrome.so
+# registers its native methods against -- into
+# out/.../libchrome__jni_registration.srcjar. Wrapping that in an
+# android_library and adding it to the AAR does not work: every Java target
+# *filters GEN_JNI out of its main jar on purpose*, keeping it in a separate
+# .compliment.jar for d8, so that exactly one copy reaches the APK
+# (build/config/android/internal_rules.gni:3965). dist_aar packages main jars,
+# so it gets J.N and never GEN_JNI, and the library loads and then:
+#
+#   java.lang.NoClassDefFoundError: Failed resolution of: Lorg/jni_zero/GEN_JNI;
+#
+# So the registration goes where BuildConfig and NativeLibraries went: into the
+# app's own source, copied there by tools/build/export-aar.sh. That is the right
+# home for the same reason -- "exactly one copy per APK" is a fact about the
+# APK, and Cobalt's Gradle app is the APK.
 dist_aar("cobalt_content_dist_aar") {
   # The engine itself.
   native_libraries = [ "$root_build_dir/libchrome.so" ]
@@ -144,6 +165,48 @@ dist_aar("cobalt_content_dist_aar") {
     # ContentView and ContentViewRenderView -- the SurfaceView that
     # modules/app/.../content/ContentSurface.kt already stands in for.
     "//components/embedder_support/android:content_view_java",
+
+    # Chrome's Java, and it turns out not to be optional.
+    #
+    # libchrome.so is Chrome's browser layer -- which is the point, since
+    # extensions live there -- and Chrome's C++ calls Chrome's Java during
+    # startup. Without this, ContentMain::start gets as far as:
+    #
+    #   ClassNotFoundException:
+    #     org/chromium/chrome/browser/app/flags/ChromeCachedFlags
+    #       at J.N.M1Y_XVCN(Native Method)
+    #       at GEN_JNI.org_chromium_content_app_ContentMain_start
+    #
+    # This is the mismatch predicted several steps back, in its true form. It
+    # was never about JNI *registration* -- that was a separate, real problem,
+    # fixed by turning multiplexing off and compiling GEN_JNI into the app. It
+    # is that a browser layer and its Java are one thing.
+    #
+    # It costs the "zero org/chromium/chrome classes" property the first spike
+    # measured. That was a pleasing number measuring the wrong property: what
+    # matters is that Cobalt does not *use* Chrome's interface, not that the
+    # artifact never contains it. R8 strips what the app never reaches.
+    # NOT chrome_java: chrome_all_java.
+    #
+    # chrome_java is one library among the ~40 that make up Chrome's Java.
+    # The APK depends on the java_group `chrome_all_java`
+    # (chrome/android/chrome_public_apk_tmpl.gni:452), and the pieces it adds
+    # are the `internal_java` halves of features whose public interfaces
+    # chrome_java already has -- data_sharing, tabmodel, hub, settings, the
+    # autofill and password_manager internals. Chrome's C++ calls straight into
+    # those implementations during startup, so chrome_java alone gets as far as:
+    #
+    #   jni_zero.cc:38 Failed to find class
+    #     org/chromium/components/data_sharing/DataSharingNetworkLoaderImpl
+    #   Fatal signal 5 (SIGTRAP)
+    #
+    # Those targets restrict their `visibility` to chrome_all_java, which is the
+    # build saying the same thing: they are reached through the group or not at
+    # all. Depending on the group is also what keeps this correct as the list
+    # changes upstream, rather than a copy of it that rots.
+    "//chrome/android:chrome_all_java",
+
+
 
     # NOTE: the runtime assets -- .pak bundles, ICU data, the bundled uBlock
     # Origin CRX -- are deliberately NOT listed here, because listing them does
@@ -184,31 +247,35 @@ dist_aar("cobalt_content_dist_aar") {
     "_COROUTINE/*",
     "org/jetbrains/annotations/*",
     "org/intellij/*",
+    # jspecify arrives with androidx.core once the app's version is forced up
+    # to match Chromium's, so the AAR's copy collides the same way.
+    "org/jspecify/*",
+
+    # Chrome's Java brings okio and okhttp, and the app already has both --
+    # OkHttpPageLoader is the 0.1.0 document engine's fetcher.
+    "okio/*",
+    "okhttp3/*",
   ]
 
-  # No Android resources, for now.
+  # Resources are included, and they have to be.
   #
-  # The resource zips carry androidx's resources alongside Chromium's, and
-  # excluding androidx's *classes* above does not exclude those. The result is
-  # duplicate definitions inside the AAR itself, which AGP refuses:
+  # They were excluded at first, because dist_aar merges androidx's resource
+  # zips in with Chromium's and AGP then rejects the duplicates:
   #
   #   [attr/elevation] values_11.xml [attr/elevation] values_19.xml:
   #   Error: Duplicate resources
   #
-  # They cannot be excluded by path either -- dist_aar has already merged every
-  # source into values_<n>.xml, so androidx's and Chromium's are indistinguishable
-  # by then.
+  # But Chromium's Java references its own R classes, so excluding them only
+  # moves the failure to runtime, where it is worse:
   #
-  # This is a real limitation and not a decision. Chromium's Java does use its
-  # own resources -- layouts for its dialogs, drawables, strings -- and anything
-  # that reaches for one will fail at runtime with a missing resource rather than
-  # at build time. Starting the browser process does not need them, which is what
-  # this is for; the shell's later surfaces may.
+  #   NoClassDefFoundError: Failed resolution of: Lorg/chromium/ui/R$integer;
+  #     at DeviceFormFactor.detectScreenWidthBucket
   #
-  # The fix, when it is needed, is to stop excluding androidx classes and instead
-  # keep the AAR's copies while excluding the app's -- or to split the resource
-  # zips before dist_aar merges them.
-  resource_excluded_patterns = [ "*" ]
+  # The duplicates are resolved on the way out instead, in
+  # tools/build/flatten-aar-res.py, which merges the values files and keeps the
+  # first definition of each (type, name). They cannot be filtered here: by the
+  # time dist_aar runs, every source has already been merged into
+  # values_<n>.xml and androidx's are indistinguishable from Chromium's.
 }
 '''
 
@@ -220,16 +287,39 @@ def main() -> int:
         return 1
 
     text = path.read_text(encoding="utf-8")
-    if MARKER in text:
-        print("  chrome/android/BUILD.gn (cobalt_content_dist_aar)  already applied")
-        return 0
+
+    # Rewritten rather than skipped when it is already there.
+    #
+    # The usual "marker present, nothing to do" would freeze whatever version of
+    # this target the tree happened to receive first, and it has changed several
+    # times -- the deps list most of all. A patch that cannot correct its own
+    # previous output is a patch that quietly keeps building a stale artifact,
+    # which is a failure this project has already paid for once.
+    #
+    # Safe because the block is self-delimiting: it is appended last, opens with
+    # BANNER and runs to the end of the file, so replacing from BANNER onwards
+    # cannot touch anything upstream owns.
+    banner_at = text.find(BANNER)
+    state = "patched"
+    if banner_at != -1:
+        if text[banner_at:] == TARGET.lstrip("\n"):
+            print("  chrome/android/BUILD.gn (cobalt_content_dist_aar)  "
+                  "already applied")
+            return 0
+        text = text[:banner_at]
+        state = "rewritten"
+    elif MARKER in text:
+        print(f"  {REL}: {MARKER} is present but Cobalt's banner is not. "
+              "Something else wrote this target; overwriting it would destroy "
+              "that.", file=sys.stderr)
+        return 1
 
     # Appended rather than inserted at an anchor: this target belongs to Cobalt
     # and has no natural neighbour, and the end of the file is the least likely
     # place for an upstream edit to land on top of it.
     path.write_bytes((text.rstrip("\n") + "\n" + TARGET)
                      .replace("\r\n", "\n").encode("utf-8"))
-    print("  chrome/android/BUILD.gn (cobalt_content_dist_aar)  patched")
+    print(f"  chrome/android/BUILD.gn (cobalt_content_dist_aar)  {state}")
     print("\nBuild it with:\n"
           "  autoninja -C out/Default -j 6 chrome/android:cobalt_content_dist_aar")
     return 0

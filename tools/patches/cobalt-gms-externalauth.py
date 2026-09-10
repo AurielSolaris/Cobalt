@@ -222,24 +222,24 @@ def patch_java() -> str:
 
 
 def patch_build_gn() -> str:
-    return edit(
-        "components/externalauth/android/BUILD.gn",
-        [(
-            '''  deps = [
-    "$google_play_services_package:google_play_services_base_java",
-    "$google_play_services_package:google_play_services_basement_java",
-    "//base:base_java",
-''',
-            '''  # Cobalt ships no Google Play Services (decision 0013): ExternalAuthUtils
-  # answers "no" unconditionally, so it no longer references any GMS type.
-  deps = [
-    "//base:base_java",
-''',
-        ), (
-            '    "//third_party/android_deps:chromium_play_services_availability_java",\n',
-            "",
-        )],
-        done_marker="Cobalt ships no Google Play Services (decision 0013)")
+    """Not removed. The behaviour change stands; the dependency does not.
+
+    ExternalAuthUtils.java no longer references a single GMS type, which made
+    the target's base/basement deps look removable. They are not:
+    `UserRecoverableErrorHandler.java`, in the same target, still imports
+    `com.google.android.gms.common.GoogleApiAvailability`, and Chromium's
+    check_for_missing_direct_deps fails the build without them.
+
+    That was found the expensive way -- by breaking chrome_public_apk -- because
+    the check here was "does *this file* still mention GMS" rather than "does
+    this *target* still need the dep". A target is the unit, not a file.
+
+    Finishing it means neutering UserRecoverableErrorHandler too, which is
+    reasonable work: with no Play Services there is no recoverable Play Services
+    error to offer the user a fix for. Not done here, so this patch changes
+    behaviour and removes no edges.
+    """
+    return "skipped (UserRecoverableErrorHandler still imports GMS)"
 
 
 STEPS = [

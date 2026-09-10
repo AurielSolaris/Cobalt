@@ -68,6 +68,13 @@ tool assets/brand-android-logos.py --src $SRC
 # square foreground; these are the round icon's background and the monochrome
 # themed icon, both of which were still Chromium's pinwheel.
 tool assets/brand-launcher-layers.py --src $SRC
+
+# brand-chromium.py writes the same PNG to app_icon.png and layered_app_icon.png.
+# Android lint refuses byte-identical icons and its step fails on any output at
+# all, so this broke chrome_public_apk. It is also simply wrong: the layered one
+# is an adaptive icon's foreground and belongs inset in the 66/108 safe zone,
+# or the launcher's mask clips it.
+tool assets/inset-adaptive-foreground.py --src $SRC
 tool assets/brand-strings.py --src $SRC
 
 note ===== Android platform fixes =====
@@ -117,7 +124,25 @@ tool patches/cobalt-gms-externalauth.py $SRC
 # externalauth above it now always answers no.
 tool patches/cobalt-gms-singles.py $SRC
 
+# WebOTP. Not a feature removal so much as a startup fix: SmsProviderGms asks
+# GoogleApiAvailability whether Play Services is present, and on an app with no
+# GMS manifest tag that question throws rather than answering, killing the
+# browser process during startup. Cobalt answers it without asking.
+tool patches/cobalt-gms-webotp.py $SRC
+
 note ===== Shell =====
+
+# ContentViewRenderView, the Android View a WebContents composites into. Chrome
+# uses chrome/android's CompositorViewHolder instead, so neither half of this is
+# in chrome_public_apk's graph. Both halves go in: the Java into chrome_all_java
+# (which is where GEN_JNI is generated from), the C++ into libchrome.
+tool patches/cobalt-content-view-render-view.py $SRC
+
+# Compiling that file into Chrome's build also lints it for the first time,
+# and it fails NewApi five times on calls guarded by a native feature check.
+# content_shell_apk, the only target that ever built it, does not enable lint.
+tool patches/cobalt-lint-content-view-render-view.py $SRC
+
 
 # Chromium cannot compile Compose (its kotlinc has no plugin support), so
 # Cobalt's interface is built in the Gradle project and Chromium arrives as an
