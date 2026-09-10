@@ -169,26 +169,55 @@ the paths the engine looks for are unchanged. Patching `dist_aar.py` to support
 assets would be tidier and is a change to a shared script for one consumer's
 benefit.
 
-### The mismatch this exposes, which is the real finding
+### The mismatch I predicted, the fix I built, and why both were wrong
 
-`libchrome.so` is built for `chrome_public_apk`, and its JNI registration is
-generated from *that* APK's Java — `chrome/android`'s, which this AAR
-deliberately does not carry. **A native library whose registration references
-Java classes that are not present is a startup problem, not a packaging one**,
-and it will not appear until something calls `BrowserStartupController`.
+`libchrome.so` is built for `chrome_public_apk` and its JNI registration is
+generated from *that* APK's Java — `chrome/android`'s, which this AAR does not
+carry. That looked like a startup failure waiting to happen, and the fix looked
+obvious: give Cobalt its own `shared_library` whose registration comes from the
+Java Cobalt actually ships.
 
-Two ways out, and the choice has not been made:
+**It was built. It achieves nothing.**
 
-1. **Ship `chrome/android`'s Java in the AAR too.** Straightforward, and it
-   undoes the "zero Chrome classes" result — Cobalt would carry Chrome's
-   interface without using it and lean on R8 to strip it.
-2. **Give Cobalt its own `shared_library` target**, with Chrome's browser layer
-   but JNI registration generated from the Java Cobalt actually ships. More
-   work, and the honest shape.
+`chrome_common_shared_library("libcobalt")` with
+`java_targets = [ "//chrome/android:cobalt_content_dist_aar" ]` is valid GN,
+links a 205 MB `libcobalt.so` in 46 seconds, and produces:
 
-"Just use content_shell's library" is not an option: Cobalt needs Chrome's
-browser layer rather than bare content, because extensions live there and
-extensions are why Cobalt exists.
+```
+libcobalt__jni_registration.srcjar   642860 bytes   md5 1dbf7ae576d3...
+libchrome__jni_registration.srcjar   642860 bytes   md5 1dbf7ae576d3...
+```
+
+**Byte-identical.** Pointing `java_targets` at the AAR changed no part of the
+generated registration, because a shared library's JNI surface is decided by the
+C++ it contains, not by the Java it is told about. Cobalt wants Chrome's browser
+layer — extensions live there, and extensions are why Cobalt exists — so it
+necessarily wants Chrome's JNI surface. There is no version of "Chrome's browser
+layer with content's JNI".
+
+And that undermines the problem as well as the fix. `third_party/jni_zero/jni_zero.gni:597`
+defaults to:
+
+```gn
+add_stubs_for_missing_jni = true
+remove_uncalled_jni = true
+```
+
+So a registration **already** tolerates Java that is not present: missing
+implementations become stubs and uncalled natives are dropped. The startup
+failure predicted here may simply not occur.
+
+**Both the fix and the problem are now unproven, and only one test settles
+either:** load the library from the Gradle app and call
+`BrowserStartupController`. Until that runs, "the AAR needs Chrome's Java" is a
+guess in both directions.
+
+`libcobalt` was removed rather than kept — it doubled a 205 MB link for no
+measured benefit. If the startup test does find a real mismatch, that target is
+where the fix goes, and it is in git history.
+
+"Just use content_shell's library" remains unavailable for the reason above:
+Cobalt needs Chrome's browser layer, not bare content.
 
 ## Closed: Compose draws over the content surface
 
@@ -223,8 +252,10 @@ should behave identically.
 Everything above is a dependency-graph result. These are not, and each needs a
 spike of its own before anything is committed to:
 
-- **Which native library Cobalt links against** — see the JNI mismatch below.
-  This is now the largest open question in the shell work.
+- **Whether `libchrome.so` loads and starts from an app that does not carry
+  `chrome/android`'s Java.** jni_zero stubs missing JNI by default, so it may
+  simply work. This is the largest open question and it can only be answered by
+  running it.
 - **How the runtime assets reach the app**, since `dist_aar` cannot carry them.
 - **Whether a 260 MB AAR is workable for Gradle at all** — untested, and a real
   risk: the Java half alone is 55 MB before R8.
@@ -250,19 +281,19 @@ spike of its own before anything is committed to:
 3. ~~**The AAR with native libraries.**~~ **Done** — 260 MB, and it surfaced
    two things: assets cannot travel in an AAR, and `libchrome.so`'s JNI
    registration expects Java this AAR does not carry.
-4. **Resolve the JNI mismatch** — pick between shipping Chrome's Java and
-   building Cobalt's own `shared_library`. Nothing else can be wired until this
-   is settled.
-5. **`modules/app` consuming the AAR**: one hardcoded URL, no tabs, no chrome.
-   Where browser-process startup gets solved.
-6. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch,
+4. **`modules/app` consuming the AAR**: one hardcoded URL, no tabs, no chrome.
+   This is where browser-process startup gets solved, and it is also the only
+   test that settles whether the JNI surface is a real problem — the separate
+   `libcobalt` step was tried first and proved to be neither a fix nor
+   necessary.
+5. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch,
    behind the `BrowserEngine` seam in `modules/app/.../browser/engine/`, which
    `DocumentEngine` already implements for the 0.1.0 pipeline.
-7. **Bottom bar wired to it** — the four sections from 0002, with the address
+6. **Bottom bar wired to it** — the four sections from 0002, with the address
    bar and `NavigationController`.
-8. **The surfaces that are not content**: extensions (a WebUI navigation),
+7. **The surfaces that are not content**: extensions (a WebUI navigation),
    downloads, settings.
-9. **Incognito.**
+8. **Incognito.**
 
 None of this blocks [gate 2](gms-removal.md), and gate 2 should still land first
 — 0014's ordering holds, and this document does not change it. It exists so the

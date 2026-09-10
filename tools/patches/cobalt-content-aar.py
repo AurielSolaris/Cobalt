@@ -31,8 +31,12 @@ with the dependency closure at all and how much of Chromium came along
 uninvited. It did, in 21 seconds, at 55.3 MB and 22,364 classes with **zero**
 `org/chromium/chrome/` classes — the seam is in the right place.
 
-It now also carries `libchrome.so`, at 205 MB, which takes the artifact to
-**260 MB**.
+It carries `libchrome.so`, at 205 MB, taking the artifact to **260 MB**.
+
+A Cobalt-owned `libcobalt` was built and then removed; see the note in the
+target and `docs/shell-integration.md`. Short version: it builds, its JNI
+registration comes out byte-identical to `libchrome`'s, and it therefore earns
+nothing while doubling a 205 MB link.
 
 **It does not carry the runtime assets, and it cannot.** `dist_aar` has no
 mechanism for them: `build/android/gyp/dist_aar.py` accepts `--jars`,
@@ -99,8 +103,34 @@ TARGET = '''
 # with this dependency closure and how much comes along uninvited.
 # native_libraries and asset_deps are mechanical afterwards -- see
 # chromecast/BUILD.gn's cast_browser_dist_aar.
+# NOTE: there is no separate "libcobalt" here, and there was, briefly.
+#
+# The plan was a Cobalt-owned shared_library whose JNI registration was
+# generated from the Java this AAR ships, rather than from chrome_public_apk's.
+# It builds -- chrome_common_shared_library accepts it and links a 205 MB
+# libcobalt.so in 46 seconds -- and it achieves **nothing**:
+#
+#   libcobalt__jni_registration.srcjar   642860 bytes   md5 1dbf7ae5...
+#   libchrome__jni_registration.srcjar   642860 bytes   md5 1dbf7ae5...
+#
+# Byte-identical. Pointing java_targets at the AAR changed no part of the
+# generated registration, because a shared library's JNI surface is determined
+# by the C++ it contains, not by the Java it is told about. Cobalt wants
+# Chrome's browser layer -- extensions live there -- so it necessarily wants
+# Chrome's JNI surface.
+#
+# Which also undermines the problem it was meant to solve: jni_zero defaults to
+# add_stubs_for_missing_jni = true and remove_uncalled_jni = true
+# (third_party/jni_zero/jni_zero.gni:597), so a registration already tolerates
+# Java that is not present. The startup failure predicted here may simply not
+# happen. It is still untested, and the only honest test is loading the library
+# from the Gradle app.
+#
+# So the second library is gone rather than kept: it doubled a 205 MB link for
+# no measured benefit. If the startup test does find a real mismatch, this is
+# where the fix goes, and the removed target is in git history.
 dist_aar("cobalt_content_dist_aar") {
-  # The engine itself. 205 MB, and the reason the APK is what it is.
+  # The engine itself.
   native_libraries = [ "$root_build_dir/libchrome.so" ]
 
   deps = [
