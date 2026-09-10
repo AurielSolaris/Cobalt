@@ -106,6 +106,12 @@ note ===== Bundled extensions =====
 # it disableable but not removable. Decision 0006.
 tool patches/cobalt-bundle-ublock.py $SRC
 
+# Android kills background renderers; Chromium terminates the extension and
+# waits for a crash bubble Cobalt does not have, so a bundled content blocker
+# silently stops blocking for the rest of the session. Reproduced with
+# kill -9 on the extension renderer. Reloads with backoff and a cap.
+tool patches/cobalt-extension-auto-reload.py $SRC
+
 # ---------------------------------------------------------------------------
 # NOT in the series, deliberately:
 #

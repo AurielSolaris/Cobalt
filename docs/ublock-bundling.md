@@ -247,18 +247,82 @@ caught `browserAction` and `webNavigation` simply is not present here.
   notice later.
 - **The update endpoint** at `updates.cobalt.auriel` does not exist yet. Nothing
   fetches it today, by design, but it is now a named future dependency.
-- **uBO can end up `TERMINATED` and stay there.** Observed while measuring the
-  above: after opening several tabs in quick succession, the extension process
-  was killed and `developerPrivate.getExtensionsInfo` reported
-  `state: "TERMINATED"` with no recovery. In that state the extension is inert
-  — the quota numbers dropped straight back to the shared pool, which is how it
-  was noticed — and Cobalt's UI says nothing about it. Chrome desktop surfaces
-  a reload prompt for this; Cobalt does not, and MV2 background pages are not
-  restarted automatically the way MV3 service workers are.
+- ~~**uBO can end up `TERMINATED` and stay there.**~~ **Fixed** — see below.
 
-  This matters more than it would on a desktop: the target hardware is 4 GB and
-  two cores ([decision 0004](decisions/0004-performance-budget.md)), so process
-  kills are the expected case, and a content blocker that silently stops
-  blocking is the worst failure mode this browser has. Not yet diagnosed — how
-  often it happens, and whether the right fix is auto-reload or a visible
-  prompt, is unmeasured.
+## Fixed: a killed extension never came back
+
+The worst bug found so far, and it was found by accident while measuring
+something else.
+
+**Reproduced deterministically:**
+
+```
+$ adb shell su -c 'kill -9 <extension renderer pid>'
+
+developerPrivate.getExtensionsInfo   ->  state: "TERMINATED"
+navigate to static.doubleclick.net/instream/ad_status.js
+    before:  ERR_BLOCKED_BY_CLIENT, "This page has been blocked by an extension"
+    after:   window.google_ad_status = 1;      <- the ad script runs
+```
+
+The process stayed dead, the extension stayed `TERMINATED`, and nothing in the
+UI said so. **The content blocker stops blocking and does not tell anyone.**
+
+### Why upstream does not hit this
+
+`ExtensionService::OnExtensionHostRenderProcessGone` posts
+`ExtensionRegistrar::TerminateExtension`, commented "either fully working or not
+loaded at all, but never half-crashed" — deliberate and correct. What follows it
+on desktop is a **crash bubble** offering Reload. There is no automatic reload
+anywhere in Chromium, because desktop does not need one: desktop renderers are
+not killed by an out-of-memory killer, and a human is looking at the window.
+
+Neither holds on Android. Killing background renderers is routine, Cobalt
+targets 4 GB and two cores, and Cobalt has no crash bubble.
+
+Worth knowing why it is *structurally* likely here:
+`ProcessRankPolicyAndroid::CalculateRank` ranks on focus, visibility and
+active-tab. **An extension background page is never any of the three**, so it
+sits at the bottom of the kill list permanently.
+
+### The fix
+
+`tools/patches/cobalt-extension-auto-reload.py`, in the series. A Cobalt-owned
+`ExtensionHostRegistry::Observer` in
+`chrome/browser/cobalt/extension_recovery/` reloads a terminated extension:
+
+| attempt | 1 | 2 | 3 | 4 | 5 | then |
+|---|---|---|---|---|---|---|
+| delay | 2s | 8s | 30s | 60s | 120s | give up, loudly |
+
+The counter resets after five minutes of health, so an extension killed once a
+day is always recovered. A user-disabled or blocklisted extension is left alone
+— that is a decision, not a crash.
+
+**This is recovery, not prevention.** The right prevention is teaching
+`ProcessRankPolicyAndroid` that an extension host is not a discardable
+background tab, which is a larger change and can never be complete anyway: on a
+4 GB device Android eventually wins, so recovery has to exist regardless.
+
+Verified on device against the reproduction above:
+
+```
+W chromium: [extension_auto_reload.cc:82] Cobalt: extension fimbmjia...
+            terminated (renderer gone); reloading in 2s (attempt 1 of 5)
+state: ENABLED
+static.doubleclick.net is blocked  /  ERR_BLOCKED_BY_CLIENT
+```
+
+### Three things the compiler and I disagreed about first
+
+- `kDelays[attempt]` on a C array — rejected by `-Werror,-Wunsafe-buffer-usage`.
+  Now a `switch`.
+- The forward declaration went next to `ChromeExtensionRegistrarDelegate`, which
+  is **inside `namespace extensions`**, so it declared
+  `extensions::cobalt::ExtensionAutoReload` — compiled fine, then failed at the
+  point of use with "allocation of incomplete type". Now at global scope, with
+  the member written `::cobalt::`.
+- The first draft wrote `chrome/browser/cobalt/extensions/BUILD.gn`, which
+  **already belongs to the uBO bundling patch** and was silently clobbered. The
+  component now owns `chrome/browser/cobalt/extension_recovery/` instead, so
+  the two patches cannot collide and neither depends on series order.

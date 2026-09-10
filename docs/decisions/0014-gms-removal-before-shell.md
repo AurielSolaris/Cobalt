@@ -82,14 +82,34 @@ question is how long, not whether. Large is not the same as uncertain.
 Safe Browsing stays throughout: it is an HTTPS service, not a GMS library
 (0013).
 
-## One thing to check before the shell starts
+## One thing to check before the shell starts — checked: **no**
 
 **Does `chrome://extensions` depend on `chrome/android`?**
 
-This is the shell's one genuine viability risk. If the extension UI cannot be
-reached from Cobalt's own shell, that changes the plan rather than the schedule,
-and it is the sort of thing better learned early. A `gn path` spike answers it
-in under an hour and needs no build.
+This was the shell's one genuine viability risk: if the extension UI could not
+be reached from Cobalt's own shell, that would change the plan rather than the
+schedule. Answered with `gn`, no build required.
+
+```
+$ gn path out/Default //chrome/browser/ui:ui //chrome/android:chrome_java
+No non-data paths found between these two targets.
+```
+
+`//chrome/browser/ui:ui` owns `webui/extensions/extensions_ui.cc`, and it builds
+under **`if (enable_extensions_core)`** — the flag Cobalt sets — not
+`enable_extensions`. `ExtensionsUIConfig` is registered under the same
+buildflag in `chrome_web_ui_configs.cc`. And the whole of the Android-specific
+code inside `extensions_ui.cc` is two `#if BUILDFLAG(IS_ANDROID)` blocks, one
+including a header and the other adding a product logo image.
+
+So `chrome://extensions` is a WebUI page like any other: C++ and HTML rendered
+in a WebContents. Everything Cobalt's shell has to provide is the ability to
+navigate a tab to a URL. Confirmed empirically as well — the page renders on
+device today and `chrome.developerPrivate.getExtensionsInfo` returns real data
+from it.
+
+**The shell's risk is schedule, not viability**, exactly as this decision
+assumed. Nothing here changes the plan.
 
 ## Consequences
 
