@@ -72,6 +72,9 @@ interface ShellEngine {
     /** The engine's downloads, once it is ready; null if this engine has none. */
     val downloads: DownloadsSource? get() = null
 
+    /** The engine's bookmark store, once it is ready; null if this engine has none. */
+    val bookmarks: BookmarksSource? get() = null
+
     /**
      * Whether this engine displays PDFs itself. Chromium does, through the
      * bundled pdf.js; the document engine does not, and a PDF goes to another

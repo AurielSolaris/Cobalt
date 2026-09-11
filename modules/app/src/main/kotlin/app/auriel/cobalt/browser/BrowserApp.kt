@@ -71,6 +71,10 @@ fun BrowserApp(
     onOpenInNewTab: (String) -> Unit,
     downloadActions: DownloadActions,
     onDismissDownloadNotice: () -> Unit,
+    bookmarkActions: BookmarkActions,
+    onToggleBookmark: () -> Unit,
+    onClearSiteData: (onDone: () -> Unit) -> Boolean,
+    onShare: () -> Unit,
 ) {
     val tab = state.activeTab
     var sheet by remember { mutableStateOf<Sheet?>(null) }
@@ -104,6 +108,7 @@ fun BrowserApp(
                                 onClose = { onSectionSelected(Section.Home) },
                                 onOpen = onOpenInNewTab,
                                 downloadActions = downloadActions,
+                                bookmarkActions = bookmarkActions,
                             )
                         }
 
@@ -146,6 +151,7 @@ fun BrowserApp(
                     incognito = tab.incognito,
                     security = tab.page.security,
                     certificate = certificate,
+                    onClearSiteData = onClearSiteData,
                     tabCount = state.tabs.size,
                     tabsOpen = sheet == Sheet.Tabs,
                     onTextChanged = onAddressChanged,
@@ -168,10 +174,13 @@ fun BrowserApp(
                     actions = MenuActions(
                         canGoForward = tab.page.canGoForward,
                         hasPage = tab.hasPage && state.section == Section.Home,
+                        bookmarked = if (state.bookmarks == null) null else state.activeBookmarked,
+                        onToggleBookmark = onToggleBookmark,
                         onNewTab = { onNewTab(false) },
                         onForward = onForward,
                         onReload = onReload,
                         onScreenshot = { onScreenshot(pageBounds[0]) },
+                        onShare = onShare,
                         onHome = onHome,
                         onExtensions = { onSectionSelected(Section.Extensions) },
                         onDownloads = { onSectionSelected(Section.Downloads) },
@@ -228,10 +237,12 @@ private fun SectionScreen(
     onClose: () -> Unit,
     onOpen: (String) -> Unit,
     downloadActions: DownloadActions,
+    bookmarkActions: BookmarkActions,
 ) {
     when (state.section) {
         Section.Settings -> SettingsScreen(about = about, onClose = onClose, onOpen = onOpen)
         Section.Downloads -> DownloadsScreen(state.downloads, downloadActions)
+        Section.Bookmarks -> BookmarksScreen(state.bookmarks, bookmarkActions)
 
         Section.Home, Section.Tabs -> Unit
 
@@ -241,12 +252,6 @@ private fun SectionScreen(
             title = "Extensions",
             detail = "Extensions run on Chromium's own extension system, which this " +
                 "build does not carry.",
-        )
-
-        Section.Bookmarks -> ComingLater(
-            title = "Bookmarks",
-            detail = "Bookmarks arrive on top of Chromium's own store. " +
-                "Cobalt would rather show nothing than a list that forgets itself.",
         )
     }
 }

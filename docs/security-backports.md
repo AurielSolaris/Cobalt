@@ -8,6 +8,65 @@ takes security fixes by backport. This page is how to check that claim.
 How fixes are found, adapted and landed is in [`backporting.md`](backporting.md).
 Each patch file in `patches/security/` carries its own provenance header.
 
+## 0.4.2 (September 2026)
+
+Seven of the eight 0.4.1 deferrals: the three PowerVR fixes that 0.4.1 put
+first in line, and the File System Access, GPU client, Omnibox and DevTools
+fixes. All seven are from the same two Chrome releases, found the same way, and
+none needed a rebase. Only #19 is left, the one that might.
+
+| Issue | CVE | Severity | Component | Upstream | Backport |
+|---|---|---|---|---|---|
+| #4 | CVE-2026-87464 | Critical | Use after free in WebGL (ANGLE GL, PowerVR Android) | angle `82f9e7ef4530` (M153), with its prerequisite `a17d5224d83f` (M151) | adapted, prerequisite included |
+| #23 | CVE-2026-85050 | High | Out of bounds write in WebGL (ANGLE GL, PowerVR) | angle `7df613367a1d` (M152) | verbatim logic |
+| #3 | CVE-2026-87438 | Critical | Out of bounds write in WebGL (ANGLE GL, PowerVR) | angle `fca5efdfeff5` (M153) | adapted |
+| #14 | CVE-2026-84354 | High | Incorrect authorization in FileSystem | src `a4775d86854c` + `da77132fcf66` (main, Chrome 152) | adapted, both changes |
+| #13 | CVE-2026-84351 | High | Out of bounds write in GPU (GLES2 client) | src `4bb7d52b63ad` (M152) | regenerated from the generator |
+| #15 | CVE-2026-84357 | High | Omnibox (document provider) | src `a9d6126968cd` (M152) | verbatim code |
+| #17 | CVE-2026-85042 | High | Use after free in DevTools | src `4dfbc081b5e3` (M152) | adapted |
+
+- **#4** extends a workaround, `reattachTextureToFboAfterLayerIncrease`, that
+  M140's ANGLE does not have. So the M151 change that introduced it (itself a
+  fix, bug 541748549) is carried in the same patch. It touches ANGLE's core
+  `Framebuffer` and `Texture` observers, with the new code behind a PowerVR
+  Android feature.
+- **#3** has a companion change in `gpu/command_buffer/service`, which patches
+  the validating decoder; Cobalt never runs that decoder (see #1), so only the
+  ANGLE half is taken. Upstream reverted it on M152 for lack of bake time and
+  kept it on M153. In Cobalt it is limited to PowerVR, the same as upstream.
+- **#14** is the rename check (`FileSystemHandle.move()` now needs write access
+  to the parent directory) and the change that enabled it by default, carried
+  together with the defaults Chrome shipped. File System Access on local files
+  is stable on Android in M140, so any page reaches it.
+- **#13** is 40 KB, most of it generated. It was not hand-edited. The
+  generator changes were applied, and M140's own generator was run; before
+  the change it reproduces M140's checked-in files byte for byte, so its
+  output differs only by the fix. The fix clamps every `glGet*` result to
+  `GLGetNumValuesReturned(pname)`, so a pname missing from that table would
+  come back empty and break WebGL. So every pname M140's clamped getters
+  accept was checked against the table, by enum value: M140 leaves out exactly
+  the pnames upstream leaves out, which the client answers from its caches
+  and which never reach the clamp.
+- **#15** is in Chrome's omnibox document provider, which is compiled into
+  Cobalt but not driven by Cobalt's address bar. It is taken for completeness.
+- **#17** is reachable only with remote debugging on, or through an extension
+  using `chrome.debugger`.
+- Each ANGLE patch declares its feature at its own place in ANGLE's feature
+  lists. The first draft appended each one after the last, and the series'
+  "already applied" check, a reverse apply, then failed for every patch whose
+  context a later one had changed, 0.4.1's CVE-2026-87488 included. No two
+  backports may share diff context; see `tools/patches/series.txt`.
+
+The ANGLE fixes only run on ANGLE's GL backend on PowerVR GPUs. They were
+built and smoke-tested on a Mali phone (Galaxy M31), where ANGLE runs on Vulkan,
+so that test shows they break nothing there. It does not exercise them. They
+have not been run on PowerVR hardware.
+
+The #13 clamp was checked on the same phone with WebGL Report's WebGL 2 page,
+which reads every limit through `glGet*`. All of them came back, including the
+two-value ones (line width range, viewport dimensions). The WebGL Aquarium ran
+at 34 fps.
+
 ## 0.4.1 (September 2026)
 
 Source: the 25 issues filed by the security watcher for **Chrome
@@ -54,14 +113,8 @@ Checked against the build, not assumed.
 | Issue | CVE | Why not now |
 |---|---|---|
 | #19 | CVE-2026-85045 (High, V8 Maglev) | **Possible rebase trigger 1.** V8 14.0 represents HeapNumber virtual objects differently: a raw number materialised as one shared literal, which is very likely the same bug. Upstream's fix is written against a representation 14.0 does not have, so carrying it means writing new deoptimisation code with nothing upstream to check it against. 0016: a subtly wrong security fix is worse than a missing one, because it reports as fixed. Needs V8-specialist review before it is either written or declared a rebase trigger. |
-| #3 | CVE-2026-87438 (Critical, WebGL) | PowerVR driver workaround; upstream itself reverted it on M152 as "nontrivial, may risk stability", keeping it on M153 only. |
-| #4 | CVE-2026-87464 (Critical, WebGL) | PowerVR only, and it extends a workaround (`reattachTextureToFboAfterLayerIncrease`) that M140's ANGLE does not have. Taking it means first backporting that change, which touches ANGLE's core `Framebuffer`. |
-| #23 | CVE-2026-85050 (High, WebGL) | PowerVR only; same situation as #4. |
-| #13 | CVE-2026-84351 (High, GPU) | Reachable (the GLES2 client runs in the renderer), but 40 KB across generated files; wants regenerating from the generator, not hand-editing. Next batch. |
-| #14 | CVE-2026-84354 (High, FileSystem) | A feature default; next batch. |
-| #15 | CVE-2026-84357 (High, Omnibox) | Chrome's omnibox document provider, which Cobalt's own address bar does not drive. Applies cleanly; next batch for completeness. |
-| #17 | CVE-2026-85042 (High, DevTools) | Reachable only with remote debugging on; next batch. |
 
 PowerVR matters more than it looks: budget MediaTek phones (Helio G35/G37 and
 similar) ship PowerVR GPUs, which is exactly Cobalt's 4 GB target class. #3, #4
-and #23 are the first things to take in the next batch.
+and #23 were taken in 0.4.2, with #13, #14, #15 and #17; see above. Only #19
+is still deferred: the one that may force a rebase.

@@ -526,6 +526,53 @@ same, reduced, Chromium 140 UA with nothing added.
   <img src="images/shell/pdf.png" width="180" alt="A PDF in pdf.js, with the green lock popup">
 </p>
 
+### 0.4.2: tabs that survive, bookmarks, site data, share
+
+**Tabs survive the app closing**: swiped from Recents, killed by Android in
+the background, crashed, or updated. Each tab's history is saved in Chrome's
+own tab-state format: `WebContentsStateBridge.getContentsStateAsByteBuffer`,
+the pickle Chrome writes for every tab it restores. `browser/tabs/TabStore.kt`
+keeps them in one file, replaced whole through `AtomicFile`. The tabs are
+written a second after anything they show changes, and at once in `onStop`.
+Incognito tabs are never written.
+
+Restoring goes back through `restoreContentsFromByteBuffer` with **no
+renderer**: the navigation entries come back, titles and addresses included,
+and nothing loads until the tab is first shown (`loadIfNecessary` in
+`ChromiumSession.attach`). Thirty restored tabs cost thirty lists of
+addresses, not thirty renderer processes. Back and forward survive too.
+Verified on device by force-stopping the app while it was in the foreground,
+so no `onStop` ran and only the background save protected the tabs.
+
+Because the tabs now persist, a link from another app opens in a new tab
+unless the tab on screen is blank. It no longer replaces the page you left
+open.
+
+**Bookmarks** are Chromium's own store, the `BookmarkModel` Chrome's bookmark
+manager drives, and Chromium writes the file. The ⋮ sheet has a Bookmark tile
+(filled and labelled "Saved" once the page is bookmarked). The Bookmarks page
+lists every bookmark, newest first, and removing one is red and asks first.
+New bookmarks go in "Mobile bookmarks", as on Chrome for Android.
+
+One thing was not obvious. The model never finishes loading unless a
+"partner bookmarks" provider has been registered: `BookmarkBridge` asserts
+`sPartnerBookmarkIteratorSupplier.hasValue()`. Partner bookmarks are ones a
+phone maker preloads, and Chrome registers the provider in its own start-up,
+which Cobalt does not run. Cobalt registers one that supplies none. A null
+iterator is the documented "no partner bookmarks".
+
+**Clear cookies and site data** is in the lock popup, for web pages. It goes
+through `BrowsingDataModel.removeBrowsingData`, the path Chrome's site settings
+use (`Website.clearAllStoredData`), for the page's host and its registrable
+domain, because sites keep cookies on both. That removes cookies, local and
+session storage, IndexedDB, Cache Storage and the rest of what the site keeps,
+then reloads the page. The HTTP cache is not keyed by site and is not touched:
+it holds copies of files, not sign-ins.
+
+**Share** sends the page's address through Android's share sheet. The ⋮ sheet's
+page actions are now two rows of three, because six tiles in one row cut
+their labels short.
+
 ### Found, not yet fixed
 
 - **`chrome://credits` is Chromium's placeholder**: "This is sample credits

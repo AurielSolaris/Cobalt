@@ -42,7 +42,7 @@ data class TabList(
  * Not thread-safe; every call is on the main thread, where Chromium requires
  * its own calls to be anyway.
  */
-class TabModel(private val engine: BrowserEngine) {
+class TabModel(private val engine: BrowserEngine, saved: SavedTabs? = null) {
 
     private var nextId = 1L
     private var destroyed = false
@@ -51,10 +51,45 @@ class TabModel(private val engine: BrowserEngine) {
     val state: StateFlow<TabList>
 
     init {
-        val first = create(incognito = false)
-        _state = MutableStateFlow(TabList(listOf(first), first.id))
+        val restored = saved?.tabs.orEmpty().map(::restore)
+        val initial = if (restored.isEmpty()) {
+            create(incognito = false).let { TabList(listOf(it), it.id) }
+        } else {
+            val active = restored[saved!!.activeIndex.coerceIn(restored.indices)]
+            TabList(restored, active.id)
+        }
+        _state = MutableStateFlow(initial)
         state = _state.asStateFlow()
-        engine.show(first.session)
+        engine.show(initial.active.session)
+    }
+
+    /**
+     * The engine's own history if it can read it back, else a fresh session
+     * at the saved address, else a blank tab. Never lost: a tab the engine
+     * cannot restore still comes back as its address.
+     */
+    private fun restore(tab: SavedTab): BrowserTab {
+        val session = tab.state?.let(engine::restoreSession)
+            ?: engine.createSession(incognito = false).also { fresh -> tab.url?.let(fresh::loadUrl) }
+        return BrowserTab(nextId++, incognito = false, session)
+    }
+
+    /**
+     * What [TabStore] writes: every tab that is not incognito, and which is
+     * active. Null once destroyed: the sessions are gone, and writing the empty
+     * result would erase the tabs from disk.
+     */
+    fun snapshot(): SavedTabs? {
+        if (destroyed) return null
+        val list = _state.value
+        val kept = list.tabs.filterNot { it.incognito }
+        return SavedTabs(
+            tabs = kept.map { tab ->
+                val page = tab.session.state.value
+                SavedTab(page.url, page.title, tab.session.saveState())
+            },
+            activeIndex = kept.indexOfFirst { it.id == list.activeId }.coerceAtLeast(0),
+        )
     }
 
     /** Opens a tab after the active one and makes it active. */

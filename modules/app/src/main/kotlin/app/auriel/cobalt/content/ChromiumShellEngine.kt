@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
+import app.auriel.cobalt.browser.engine.BookmarksSource
 import app.auriel.cobalt.browser.engine.BrowserEngine
 import app.auriel.cobalt.browser.engine.DownloadsSource
 import app.auriel.cobalt.core.net.UserAgent
@@ -37,6 +38,9 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
 
     override val downloads: DownloadsSource? get() = chromiumDownloads
 
+    private var chromiumBookmarks: ChromiumBookmarks? = null
+    override val bookmarks: BookmarksSource? get() = chromiumBookmarks
+
     /** pdf.js is bundled (tools/patches/cobalt-bundle-ublock.py). */
     override val opensPdfs: Boolean get() = true
 
@@ -59,6 +63,7 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
                     ChromiumStartup.State.Ready -> if (chromium == null) {
                         chromium = ChromiumEngine(activity)
                         chromiumDownloads = ChromiumDownloads(activity.applicationContext)
+                        chromiumBookmarks = ChromiumBookmarks()
                         // The shell's own requests send exactly what Chromium
                         // sends; see UserAgent.
                         UserAgent.syncFrom(ContentUtils.getBrowserUserAgent())
@@ -100,6 +105,8 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
     override fun destroy() {
         chromiumDownloads?.destroy()
         chromiumDownloads = null
+        chromiumBookmarks?.destroy()
+        chromiumBookmarks = null
         chromium?.shutdown()
         chromium = null
     }

@@ -56,12 +56,15 @@ there needed two upstream gaps closed: MV2's `browserAction` schema was not buil
 for Android at all, and `webNavigation` was excluded from `desktop_android`. Both
 are now ported. See [`docs/ublock-bundling.md`](docs/ublock-bundling.md).
 
-**Ten security fixes are backported (0.4.1).** Of the 25 CVEs the security
-watch filed against 140, ten were adapted from current stable and are applied by
-the build: in ANGLE (WebGL), V8, Dawn, Skia, the compositor, the network
-stack, Cast and crash reporting. Each has its
-upstream commit, its patch file and the reason the other fifteen were not taken
-(not reachable on this build, or deferred) in
+**Seventeen security fixes are backported (0.4.1, 0.4.2).** Of the 25 CVEs the
+security watch filed against 140, seventeen were adapted from current stable
+and are applied by the build: in ANGLE (WebGL, including three fixes specific
+to PowerVR GPUs, which budget MediaTek phones use), the GPU client, V8, Dawn,
+Skia, the compositor, the network stack, Cast, crash reporting, DevTools, the
+omnibox and the File System Access API. Seven do not apply to this build. One,
+in V8, is deferred until a V8 specialist has reviewed it, because it may need
+a newer Chromium rather than a backport. Each has its
+upstream commit, its patch file and the reason for what was not taken in
 [`docs/security-backports.md`](docs/security-backports.md).
 
 In progress: porting the rest of Kiwi's patch set. Two of its patches have been
@@ -241,12 +244,18 @@ sheets that rise from that toolbar and go away when you're done
 What works, on device:
 
 - Typing an address, links, back (the system gesture) and forward, reload and stop
-- Tabs: open, switch, close, with page previews in the switcher
+- Tabs: open, switch, close, with page previews in the switcher. **Tabs survive
+  the app closing**, with their back and forward history. Restored tabs load
+  only when you open them
+- **Bookmarks**, in Chromium's own store: the Bookmark tile in the ⋮ sheet, and
+  a Bookmarks page to open or remove them
+- **Share** the page from the ⋮ sheet
 - **Extensions** opens `chrome://extensions`, with uBlock Origin installed and blocking
 - A screenshot of the visible page from the ⋮ sheet, saved to `Pictures/Cobalt`
 - Opening links from other apps
 - The lock icon explains itself: tap it for the connection's state and the
-  site's certificate (issuer, validity, SHA-256)
+  site's certificate (issuer, validity, SHA-256), and to clear the site's
+  cookies and stored data
 - Themes: Cobalt, One Dark, Solarized Light and Solarized Dark, with one theme
   for day and one for night following the phone. You can make your own on the
   phone by choosing colours, and share them as text
@@ -264,7 +273,7 @@ What works, on device:
   network, so there is no one else's certificate to doubt
 - The user agent is Chromium's own, reduced, with nothing added
 
-Not there yet: bookmarks, history, custom fonts and incognito. They have their places in the interface and say so. How the shell reaches Chromium, and every
+Not there yet: history, custom fonts and incognito. They have their places in the interface and say so. How the shell reaches Chromium, and every
 problem that took, is in [`docs/shell-integration.md`](docs/shell-integration.md).
 
 Without a Chromium build to export from, `./gradlew` builds the same shell on

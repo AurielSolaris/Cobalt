@@ -19,6 +19,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Extension
@@ -43,10 +47,14 @@ import androidx.compose.ui.unit.dp
 class MenuActions(
     val canGoForward: Boolean,
     val hasPage: Boolean,
+    /** Null when the engine keeps no bookmarks: the tile is not shown. */
+    val bookmarked: Boolean?,
+    val onToggleBookmark: () -> Unit,
     val onNewTab: () -> Unit,
     val onForward: () -> Unit,
     val onReload: () -> Unit,
     val onScreenshot: () -> Unit,
+    val onShare: () -> Unit,
     val onHome: () -> Unit,
     val onExtensions: () -> Unit,
     val onDownloads: () -> Unit,
@@ -86,6 +94,8 @@ fun MenuSheet(actions: MenuActions, onDismiss: () -> Unit) {
         containerColor = colors.surfaceContainerLow,
     ) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
+            // Two rows of three: six tiles in one row cut their labels short
+            // on a phone-width screen.
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -99,9 +109,31 @@ fun MenuSheet(actions: MenuActions, onDismiss: () -> Unit) {
                     "Reload", Icons.Filled.Refresh, Modifier.weight(1f),
                     enabled = actions.hasPage, onClick = run(actions.onReload),
                 )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                actions.bookmarked?.let { bookmarked ->
+                    // Filled and in the accent when the page is bookmarked, and
+                    // the label says so too: meaning is never colour alone (0007).
+                    Tile(
+                        if (bookmarked) "Saved" else "Bookmark",
+                        if (bookmarked) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        Modifier.weight(1f),
+                        enabled = actions.hasPage,
+                        tint = if (bookmarked) colors.primary else colors.onSurface,
+                        onClick = run(actions.onToggleBookmark),
+                    )
+                }
                 Tile(
                     "Screenshot", Icons.Outlined.PhotoCamera, Modifier.weight(1f),
                     enabled = actions.hasPage, onClick = run(actions.onScreenshot),
+                )
+                Tile(
+                    "Share", Icons.Outlined.Share, Modifier.weight(1f),
+                    enabled = actions.hasPage, onClick = run(actions.onShare),
                 )
             }
 
@@ -164,6 +196,7 @@ private fun Tile(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -178,7 +211,7 @@ private fun Tile(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(6.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
     }

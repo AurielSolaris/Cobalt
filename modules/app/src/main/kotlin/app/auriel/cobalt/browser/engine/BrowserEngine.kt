@@ -58,6 +58,18 @@ interface BrowserEngine {
     fun show(session: EngineSession) {}
 
     /**
+     * Recreates a session from what [EngineSession.saveState] returned before
+     * the app last closed, off screen and **not loaded**: nothing is fetched
+     * until the session is first shown, so restoring thirty tabs costs thirty
+     * lists of addresses, not thirty renderer processes.
+     *
+     * Null when the bytes cannot be read (another engine's, or a format this
+     * build no longer understands); the shell then opens the saved address in
+     * a fresh session instead.
+     */
+    fun restoreSession(saved: ByteArray): EngineSession? = null
+
+    /**
      * Where a page's request for a new tab goes: a link with `target=_blank`,
      * a middle click, `window.open` without an opener. The shell opens a tab
      * in its own model; an engine that cannot ask simply never calls this.
@@ -108,6 +120,23 @@ interface EngineSession {
      * when there is none (http, internal pages) or the engine cannot say.
      */
     fun certificate(): CertificateSummary? = null
+
+    /**
+     * This tab's history (back and forward, and where it is in them) as bytes
+     * only this engine reads back, through [BrowserEngine.restoreSession].
+     * Null if the engine cannot, or the session is closed.
+     */
+    fun saveState(): ByteArray? = null
+
+    /**
+     * Deletes what the site on screen has stored on the phone (cookies,
+     * local storage, databases, its own caches) and reloads it, which signs
+     * you out of it. [onDone] runs once the data is gone.
+     *
+     * @return false if this engine keeps nothing to clear, and [onDone] will
+     *     not run.
+     */
+    fun clearSiteData(onDone: () -> Unit): Boolean = false
 
     /**
      * Releases this session.

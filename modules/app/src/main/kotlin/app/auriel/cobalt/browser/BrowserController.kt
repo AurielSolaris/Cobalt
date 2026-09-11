@@ -11,7 +11,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import app.auriel.cobalt.browser.engine.SessionState
 import app.auriel.cobalt.browser.engine.ShellEngine
+import app.auriel.cobalt.browser.engine.BookmarkEntry
+import app.auriel.cobalt.browser.tabs.SavedTabs
 import app.auriel.cobalt.browser.tabs.TabModel
+import app.auriel.cobalt.browser.tabs.TabStore
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import app.auriel.cobalt.core.net.FetchError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -86,7 +94,13 @@ data class BrowserState(
     val downloads: List<DownloadEntry>? = null,
     /** A download that just started or finished, shown briefly above the toolbar. */
     val downloadNotice: DownloadEntry? = null,
+    /** Null when the engine has no bookmark store (the document engine). */
+    val bookmarks: List<BookmarkEntry>? = null,
 ) {
+    /** Whether the page in the active tab is bookmarked. */
+    val activeBookmarked: Boolean
+        get() = activeTab.page.url?.let { url -> bookmarks?.any { it.url == url } } == true
+
     val activeTab: Tab get() = tabs.first { it.id == activeTabId }
 
     val normalTabCount: Int get() = tabs.count { !it.incognito }
@@ -108,8 +122,10 @@ data class BrowserState(
 class BrowserController(
     private val shell: ShellEngine,
     private val scope: CoroutineScope,
+    private val store: TabStore? = null,
+    saved: SavedTabs? = null,
 ) {
-    private val tabs = TabModel(shell.engine)
+    private val tabs = TabModel(shell.engine, saved)
     private val section = MutableStateFlow(Section.Home)
 
     /** Per tab: text being typed, and the last address that failed to parse. */
@@ -131,12 +147,19 @@ class BrowserController(
         downloadsSource?.items ?: MutableStateFlow(emptyList())
     private val notice = MutableStateFlow<DownloadEntry?>(null)
 
+    private val bookmarksSource = shell.bookmarks
+    private val bookmarks: StateFlow<List<BookmarkEntry>> =
+        bookmarksSource?.items ?: MutableStateFlow(emptyList())
+
     val state: StateFlow<BrowserState> =
-        combine(listOf(pages, section, edits, invalid, thumbnails, downloads, notice)) { snapshot() }
+        combine(listOf(pages, section, edits, invalid, thumbnails, downloads, notice, bookmarks)) { snapshot() }
             .stateIn(scope, SharingStarted.Eagerly, snapshot())
+
+    private var saving: Job? = null
 
     init {
         watchForDownloadNotices()
+        keepTabsOnDisk()
         // A page asking for a new tab gets one in Cobalt's own model, beside
         // the tab that asked.
         shell.engine.setNewTabHandler { url ->
@@ -181,6 +204,35 @@ class BrowserController(
         }
     }
 
+    /**
+     * Writes the tabs whenever what they show changes: a tab opened, closed or
+     * switched, a page committed, a title arrived. A second after the last
+     * change, so a page that loads in stages is written once, and on its own
+     * thread, so the disk never holds up the page.
+     *
+     * [saveTabsNow] covers the moment the app leaves the screen, which is the
+     * last moment it is certain to be running.
+     */
+    @OptIn(FlowPreview::class)
+    private fun keepTabsOnDisk() {
+        if (store == null) return
+        saving = scope.launch {
+            state
+                .map { s -> s.activeTabId to s.tabs.map { Triple(it.id, it.page.url, it.page.title) } }
+                .distinctUntilChanged()
+                .drop(1) // what was just restored is what is on disk
+                .debounce(1_000)
+                .collect { saveTabsNow() }
+        }
+    }
+
+    /** Writes the tabs at once. Main thread, as every engine call is. */
+    fun saveTabsNow() {
+        val store = store ?: return
+        val snapshot = tabs.snapshot() ?: return
+        scope.launch(Dispatchers.IO) { store.save(snapshot) }
+    }
+
     fun onDismissDownloadNotice() {
         notice.value = null
     }
@@ -210,8 +262,44 @@ class BrowserController(
             incognitoAvailable = shell.supportsIncognito,
             downloads = if (downloadsSource == null) null else downloads.value,
             downloadNotice = notice.value,
+            bookmarks = if (bookmarksSource == null) null else bookmarks.value,
         )
     }
+
+    // --- Bookmarks ----------------------------------------------------------
+
+    /** Bookmarks the active page, or removes it if it already is. */
+    fun onToggleBookmark() {
+        val source = bookmarksSource ?: return
+        val page = active.session.state.value
+        val url = page.url ?: return
+        val existing = bookmarks.value.filter { it.url == url }
+        if (existing.isEmpty()) {
+            source.add(url, page.title.orEmpty())
+        } else {
+            existing.forEach { source.remove(it.id) }
+        }
+    }
+
+    fun onRemoveBookmark(id: String) = bookmarksSource?.remove(id)
+
+    /**
+     * Opens a bookmark in the tab on screen, as every browser does. Straight to
+     * the engine: a saved address is already an address, and running it
+     * through what the address bar does to typing could turn it into a search.
+     */
+    fun onOpenBookmark(url: String) {
+        val id = active.id
+        edits.update { it - id }
+        invalid.update { it - id }
+        active.session.loadUrl(url)
+        section.value = Section.Home
+    }
+
+    // --- Site data ----------------------------------------------------------
+
+    /** @see EngineSession.clearSiteData */
+    fun onClearSiteData(onDone: () -> Unit): Boolean = active.session.clearSiteData(onDone)
 
     private val active get() = tabs.state.value.active
 
@@ -382,5 +470,20 @@ class BrowserController(
         else -> active.session.goBack()
     }
 
-    fun destroy() = tabs.destroy()
+    /**
+     * A web address another app handed over. Into the tab on screen if it is
+     * blank, otherwise a new one: the tabs are kept across launches now, and a
+     * link from a chat app must not replace the page you left open.
+     */
+    fun openExternal(url: String) {
+        if (active.session.state.value.url == null && !active.incognito) navigateTo(url)
+        else openInNewTab(url)
+    }
+
+    fun destroy() {
+        // Before the sessions close: a save after that would find no tabs and
+        // write an empty list over the real one.
+        saving?.cancel()
+        tabs.destroy()
+    }
 }

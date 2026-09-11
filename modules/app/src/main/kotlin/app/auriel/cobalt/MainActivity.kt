@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import app.auriel.cobalt.browser.BookmarkActions
 import app.auriel.cobalt.browser.BrowserApp
 import app.auriel.cobalt.browser.BrowserController
 import app.auriel.cobalt.browser.CenteredMessage
@@ -32,8 +33,11 @@ import app.auriel.cobalt.browser.engine.ShellEngines
 import app.auriel.cobalt.browser.settings.AboutInfo
 import app.auriel.cobalt.ui.theme.CobaltTheme
 import app.auriel.cobalt.ui.theme.ThemeStore
+import app.auriel.cobalt.browser.tabs.TabStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The browser's Activity.
@@ -66,8 +70,12 @@ class MainActivity : ComponentActivity() {
         pendingPdf = pdfFrom(intent)
         shell = ShellEngines.create(this)
         lifecycleScope.launch {
+            // Read while the engine starts; the file is small, the disk is not
+            // the main thread's business.
+            val store = TabStore(filesDir)
+            val saved = withContext(Dispatchers.IO) { store.load() }
             shell.status.first { it == ShellEngine.Status.Ready }
-            controller = BrowserController(shell, lifecycleScope)
+            controller = BrowserController(shell, lifecycleScope, store, saved)
         }
 
         setContent {
@@ -81,7 +89,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(pendingUrl) {
                 pendingUrl?.let { url ->
-                    current.navigateTo(url)
+                    current.openExternal(url)
                     pendingUrl = null
                 }
             }
@@ -131,6 +139,13 @@ class MainActivity : ComponentActivity() {
                     },
                 ),
                 onDismissDownloadNotice = current::onDismissDownloadNotice,
+                bookmarkActions = BookmarkActions(
+                    onOpen = current::onOpenBookmark,
+                    onRemove = { current.onRemoveBookmark(it) },
+                ),
+                onToggleBookmark = current::onToggleBookmark,
+                onClearSiteData = current::onClearSiteData,
+                onShare = { share(state.activeTab.page.url, state.activeTab.page.title) },
             )
         }
     }
@@ -168,6 +183,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * The page's address, through Android's share sheet. Only http(s): a
+     * staged PDF's `file://` path or a pdf.js address means nothing on
+     * another phone.
+     */
+    private fun share(url: String?, title: String?) {
+        if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) {
+            Toast.makeText(this, "Only web pages can be shared", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, url)
+            .apply { title?.takeIf { it.isNotBlank() }?.let { putExtra(Intent.EXTRA_SUBJECT, it) } }
+        startActivity(Intent.createChooser(send, null))
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -198,6 +230,15 @@ class MainActivity : ComponentActivity() {
                 current.openLocalFile(fileUrl)
             }
         }
+    }
+
+    /**
+     * The last moment the app is certain to be running: after this Android may
+     * kill it without another word, and a swipe from Recents does exactly that.
+     */
+    override fun onStop() {
+        controller?.saveTabsNow()
+        super.onStop()
     }
 
     override fun onDestroy() {

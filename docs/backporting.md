@@ -138,6 +138,11 @@ skip a backport.
   header.
 - **Landing.** `backport <repo> <CVE>` in `tools/patches/series.txt`. The kind
   is all-or-nothing: already applied, applied whole, or a loud failure.
+- **No shared context.** "Already applied" is a reverse apply, so a backport
+  whose context lines a later backport changes stops checking as applied on a
+  patched tree. ANGLE's feature lists are where this bites: declare each new
+  feature beside a different existing one, never after the last. Run the series
+  on the patched tree after adding one; every entry must say "already applied".
 
 ## Not yet built
 

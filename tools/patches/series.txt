@@ -198,3 +198,17 @@ backport .                 CVE-2026-85048
 backport third_party/skia  CVE-2026-85049
 backport .                 CVE-2026-85051
 backport .                 CVE-2026-85052
+#
+# 0.4.2 -- seven of the eight 0.4.1 deferrals (all but CVE-2026-85045, V8,
+# which may be a rebase trigger; see docs/security-backports.md). No two
+# backports may share diff context: the "already applied" test is a reverse
+# apply, and it fails for a patch whose context a later one has changed. So
+# each ANGLE feature is declared at its own place in ANGLE's feature lists, not
+# appended after the last.
+backport third_party/angle CVE-2026-87464
+backport third_party/angle CVE-2026-85050
+backport third_party/angle CVE-2026-87438
+backport .                 CVE-2026-84354
+backport .                 CVE-2026-84351
+backport .                 CVE-2026-84357
+backport .                 CVE-2026-85042

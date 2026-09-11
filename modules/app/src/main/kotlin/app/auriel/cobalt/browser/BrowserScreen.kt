@@ -27,7 +27,13 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Warning
+import android.widget.Toast
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -80,6 +86,7 @@ fun AddressBar(
     incognito: Boolean,
     security: Security,
     certificate: () -> CertificateSummary?,
+    onClearSiteData: (onDone: () -> Unit) -> Boolean,
     tabCount: Int,
     tabsOpen: Boolean,
     onTextChanged: (String) -> Unit,
@@ -129,6 +136,7 @@ fun AddressBar(
                 typing = text != pageUrl,
                 pageUrl = pageUrl,
                 certificate = certificate,
+                onClearSiteData = onClearSiteData,
             )
 
             Spacer(Modifier.width(4.dp))
@@ -248,9 +256,29 @@ private fun SecurityIndicator(
     typing: Boolean,
     pageUrl: String?,
     certificate: () -> CertificateSummary?,
+    onClearSiteData: (onDone: () -> Unit) -> Boolean,
 ) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    val host = pageUrl?.substringAfter("://")?.substringBefore('/')
+
+    if (confirmClear) {
+        ConfirmClearSiteData(
+            host = host.orEmpty(),
+            onConfirm = {
+                confirmClear = false
+                val started = onClearSiteData {
+                    Toast.makeText(context, "Cleared cookies and site data for $host", Toast.LENGTH_SHORT).show()
+                }
+                if (!started) {
+                    Toast.makeText(context, "This page has no site data to clear", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDismiss = { confirmClear = false },
+        )
+    }
 
     val (icon, tint, description) = when {
         // While typing, the icon describes the field, not the page behind it.
@@ -287,8 +315,47 @@ private fun SecurityIndicator(
             // certificate, and nobody needs that until they ask.
             val cert = remember(open) { if (open && security == Security.Secure) certificate() else null }
             SecurityDetails(security, pageUrl, cert)
+
+            // Only for sites: a file or a Cobalt page has no cookies of its own.
+            if (security == Security.Secure || security == Security.NotSecure || security == Security.Dangerous) {
+                HorizontalDivider(color = colors.outlineVariant, modifier = Modifier.padding(top = 4.dp))
+                DropdownMenuItem(
+                    text = { Text("Clear cookies and site data", color = colors.error) },
+                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = colors.error) },
+                    onClick = {
+                        open = false
+                        confirmClear = true
+                    },
+                )
+            }
         }
     }
+}
+
+/**
+ * Asked first, because it signs you out: every cookie and everything the site
+ * stored goes, for this site only. Red, like every other deletion in the shell.
+ */
+@Composable
+private fun ConfirmClearSiteData(host: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = colors.error) },
+        title = { Text("Clear data for $host?") },
+        text = {
+            Text(
+                "Cookies and everything $host and its parent domain have stored on this phone will be " +
+                    "deleted, and the page will reload. You will be signed out. Unrelated sites are not affected.",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Clear", color = colors.error, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

@@ -31,6 +31,13 @@ import org.chromium.content_public.browser.LoadUrlParams
 import org.chromium.content_public.browser.Visibility
 import org.chromium.content_public.browser.WebContents
 import org.chromium.content_public.browser.WebContentsObserver
+import java.nio.ByteBuffer
+import org.chromium.base.task.PostTask
+import org.chromium.base.task.TaskTraits
+import org.chromium.chrome.browser.browsing_data.BrowsingDataBridge
+import org.chromium.chrome.browser.tab.WebContentsState
+import org.chromium.chrome.browser.tab.WebContentsStateBridge
+import org.chromium.components.embedder_support.util.UrlUtilities
 import org.chromium.chrome.browser.cobalt.CobaltWebContentsDelegate
 import org.chromium.chrome.browser.content.WebContentsFactory
 import org.chromium.chrome.browser.profiles.ProfileManager
@@ -171,12 +178,39 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
             /* initiallyHidden= */ true,
             /* initializeRenderer= */ true,
         )
-        return ChromiumSession(
-            webContents, renderView, window,
-            onClosed = ::forget,
-            onNewTab = { url -> newTabHandler?.invoke(url) },
-        )
+        return wrap(webContents)
     }
+
+    /**
+     * A tab from before the app last closed, through Chrome's own tab-state
+     * format (`WebContentsStateBridge`, the pickle Chrome writes for every tab
+     * it restores). The first four bytes are the format version Cobalt saved
+     * with; see [ChromiumSession.saveState].
+     *
+     * No renderer: the navigation entries are put back and nothing is fetched
+     * until [ChromiumSession.attach] asks, so a restored tab that is never
+     * opened costs no process at all.
+     */
+    override fun restoreSession(saved: ByteArray): EngineSession? {
+        check(!destroyed) { "engine is destroyed" }
+        if (saved.size <= 4) return null
+        val header = ByteBuffer.wrap(saved, 0, 4)
+        val version = header.int
+        // Native reads the pickle straight out of memory, so it must be direct.
+        val buffer = ByteBuffer.allocateDirect(saved.size - 4).put(saved, 4, saved.size - 4)
+        buffer.rewind()
+        val state = WebContentsState(buffer).apply { setVersion(version) }
+        val webContents = WebContentsStateBridge.restoreContentsFromByteBuffer(
+            state, /* isHidden= */ true, /* noRenderer= */ true,
+        ) ?: return null
+        return wrap(webContents)
+    }
+
+    private fun wrap(webContents: WebContents) = ChromiumSession(
+        webContents, renderView, window,
+        onClosed = ::forget,
+        onNewTab = { url -> newTabHandler?.invoke(url) },
+    )
 
     override fun show(session: EngineSession) {
         check(!destroyed) { "engine is destroyed" }
@@ -321,6 +355,9 @@ private class ChromiumSession(
         )
         renderView.setCurrentWebContents(webContents)
         webContents.updateWebContentsVisibility(Visibility.VISIBLE)
+        // A restored tab loads here, the first time it is on screen. For any
+        // other tab there is nothing pending and this does nothing.
+        webContents.navigationController?.loadIfNecessary()
         contentView.requestFocus()
     }
 
@@ -401,6 +438,56 @@ private class ChromiumSession(
             it.groupValues[1].uppercase() to it.groupValues[2].replace("\\", "")
         }
         return parts["CN"] ?: parts["O"] ?: x500
+    }
+
+    /** Version first, then Chrome's pickle; [ChromiumEngine.restoreSession] reads both. */
+    override fun saveState(): ByteArray? {
+        if (closed) return null
+        val pickle = WebContentsStateBridge.getContentsStateAsByteBuffer(webContents) ?: return null
+        pickle.rewind()
+        val out = ByteBuffer.allocate(4 + pickle.remaining())
+        out.putInt(WebContentsState.CONTENTS_STATE_CURRENT_VERSION)
+        out.put(pickle)
+        return out.array()
+    }
+
+    /**
+     * Through the model Chrome's own site settings use to delete a site's data
+     * (`Website.clearAllStoredData`): cookies, local and session storage,
+     * IndexedDB, Cache Storage, shared storage and the rest of what the site
+     * keeps, keyed by who owns it.
+     *
+     * Owners are hosts, and a site usually keeps cookies on its registrable
+     * domain (`.example.org`) as well as on the host it served the page from
+     * (`www.example.org`), so both are cleared. The HTTP cache is not keyed by
+     * site and is not touched; it holds copies of files, not sign-ins.
+     */
+    override fun clearSiteData(onDone: () -> Unit): Boolean {
+        if (closed) return false
+        val url = webContents.lastCommittedUrl ?: return false
+        if (url.scheme != "http" && url.scheme != "https") return false
+        val host = url.host.takeIf { it.isNotEmpty() } ?: return false
+        val owners = listOfNotNull(
+            host,
+            UrlUtilities.getDomainAndRegistry(url.spec, false)?.takeIf { it.isNotEmpty() },
+        ).distinct()
+        BrowsingDataBridge.buildBrowsingDataModelFromDisk(
+            ProfileManager.getLastUsedRegularProfile(),
+        ) { model ->
+            var left = owners.size
+            for (owner in owners) {
+                model.removeBrowsingData(owner) {
+                    if (--left == 0) {
+                        // Posted, as Chrome does: destroying the model inside
+                        // its own callback can deadlock the JNI call.
+                        PostTask.postTask(TaskTraits.UI_DEFAULT) { model.destroy() }
+                        if (!closed) webContents.navigationController?.reload(false)
+                        onDone()
+                    }
+                }
+            }
+        }
+        return true
     }
 
     override fun loadUrl(url: String) {
