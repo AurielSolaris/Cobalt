@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -26,28 +28,27 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.auriel.cobalt.browser.engine.EngineSession
+import app.auriel.cobalt.browser.tabs.TabModel
 import app.auriel.cobalt.ui.theme.CobaltTheme
 
 /**
- * A page, rendered by Chromium, inside a Compose window.
+ * Pages, rendered by Chromium, inside a Compose window.
  *
- * The step after [ChromiumStartupActivity], and the one that answers the last
- * open question in `docs/shell-integration.md`: whether a `WebContents` can be
- * driven from a Compose shell that carries none of `chrome/android`'s UI.
+ * The step after [ChromiumStartupActivity]. It answered whether a `WebContents`
+ * can be driven from a Compose shell that carries none of `chrome/android`'s
+ * UI, and now exercises [TabModel] over the real engine: several tabs sharing
+ * one surface, switched with `ChromiumEngine.show`.
  *
- * It is still a spike, not the browser. One tab, one hardcoded URL, no address
- * bar, no bottom bar, no tab switcher — the interface here is a status line
- * over the page, because the question is "does it render and navigate", and
- * every control added before that is answered is a control built on a guess.
- * The real interface is `browser/BrowserScreen.kt`, and it plugs into the same
- * [EngineSession] this uses.
+ * It is still a spike, not the browser. No address bar, no bottom bar — a
+ * status line and three buttons over the page. The real interface is
+ * `browser/BrowserScreen.kt`, and it plugs into the same [TabModel].
  *
  * Not exported; launch it with root:
  *
  *     adb shell su -c 'am start -n app.auriel.cobalt.nightly/\
  *         app.auriel.cobalt.content.ChromiumPageActivity'
  *
- * An `-e url <address>` extra overrides the page, which is how this gets
+ * An `-e url <address>` extra overrides the first page, which is how this gets
  * pointed at `chrome://extensions` to check the extension surface, or at a real
  * site to check that uBlock Origin is still blocking.
  */
@@ -63,7 +64,7 @@ class ChromiumPageActivity : ComponentActivity() {
      * spike showed a fully rendered page under the words "creating the tab…",
      * which had been true for about a second.
      */
-    private var session: EngineSession? by mutableStateOf(null)
+    private var tabs: TabModel? by mutableStateOf(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,10 +74,10 @@ class ChromiumPageActivity : ComponentActivity() {
 
     override fun onDestroy() {
         // Order matters: a session is a renderer process and the engine owns the
-        // surface it draws into, so the tab goes first.
-        session?.close()
+        // surface it draws into, so the tabs go first.
+        tabs?.destroy()
         engine?.shutdown()
-        session = null
+        tabs = null
         engine = null
         super.onDestroy()
     }
@@ -101,7 +102,26 @@ class ChromiumPageActivity : ComponentActivity() {
                 // draws underneath the system clock.
                 .windowInsetsPadding(WindowInsets.statusBars)
         ) {
-            StatusLine(startup, session, failure)
+            val model = tabs
+            val list = model?.state?.collectAsState()?.value
+            StatusLine(startup, list?.active?.session, failure)
+
+            if (model != null && list != null) {
+                Row(Modifier.padding(horizontal = 4.dp)) {
+                    TextButton(onClick = { model.newTab(url = url) }) { Text("new") }
+                    TextButton(onClick = {
+                        val i = list.tabs.indexOfFirst { it.id == list.activeId }
+                        model.select(list.tabs[(i + 1) % list.tabs.size].id)
+                    }) { Text("next") }
+                    TextButton(onClick = { model.close(list.activeId) }) { Text("close") }
+                    Text(
+                        "tab ${list.tabs.indexOfFirst { it.id == list.activeId } + 1}" +
+                            " of ${list.tabs.size}",
+                        color = Color(0xFF7F848E),
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
 
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 if (startup is ChromiumStartup.State.Ready && failure == null) {
@@ -111,7 +131,9 @@ class ChromiumPageActivity : ComponentActivity() {
                             try {
                                 val created = ChromiumEngine(this@ChromiumPageActivity)
                                 engine = created
-                                session = created.createSession().also { it.loadUrl(url) }
+                                tabs = TabModel(created).also {
+                                    it.state.value.active.session.loadUrl(url)
+                                }
                                 created.createContentContainer(context)
                             } catch (t: Throwable) {
                                 // A failure here is native, and the exception is

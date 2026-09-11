@@ -55,9 +55,10 @@ Two items have since been added ahead of 1.0 that were not on this map, both
 because they are release gates rather than features:
 
 - **Removing Google Play Services entirely**
-  ([decision 0013](decisions/0013-remove-google-play-services.md)), which comes
-  **before** the shell — the reasoning, and the measurement behind it, is in
-  [decision 0014](decisions/0014-gms-removal-before-shell.md).
+  ([decision 0013](decisions/0013-remove-google-play-services.md)). The shell
+  now comes first; GMS comes out when it blocks the shell, and otherwise after
+  it — [decision 0018](decisions/0018-shell-before-gms-removal.md), superseding
+  [0014](decisions/0014-gms-removal-before-shell.md)'s order.
 - **Passwords**, because Chromium's Android password manager is disabled
   outright without a closed-source backend
   ([decision 0012](decisions/0012-own-password-store.md)). Cobalt enables
@@ -70,9 +71,9 @@ Neither `stable` nor a 1.0 happens while those are open; see
 
 ## Next
 
-1. **`unlimitedStorage` on `desktop_android`** — excluded upstream the same way
-   `webNavigation` was. uBO declares it and runs without it, but its storage
-   falls under the ordinary quota.
+1. **The shell** — tab model, bottom bar, the non-content surfaces, in the order
+   in [`shell-integration.md`](shell-integration.md). GMS dependencies it runs
+   into are removed as they are hit ([0018](decisions/0018-shell-before-gms-removal.md)).
 2. **Passwords** — starting with the spike in
    [decision 0015](decisions/0015-passwords-local-store-and-system-autofill.md):
    turn `use_login_database_as_backend` on and measure what the settings surface

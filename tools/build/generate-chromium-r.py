@@ -75,6 +75,23 @@ WIDTHS = {
     MODULE: 2, PACKAGE: 2,
 }
 
+# Packages whose R the app already has, because it depends on the library from
+# Maven and AGP writes an R for every dependency (nonTransitiveRClass=false).
+# Emitting a second one is a duplicate class: the APK tolerated it, but the
+# unit-test build bundles classes into one jar and refuses --
+#
+#     classes.jar already contains entry 'androidx/appcompat/R$attr.class'
+#
+# AGP's copy holds the same linked ids, so skipping ours loses nothing -- as long
+# as it has every field Chromium's bytecode reads, which it can only fail to at
+# runtime (NoSuchFieldError). So the skipped references are written to
+# PROVIDED_LIST, and ProvidedRFieldsTest checks each one against the app's R.
+PROVIDED_BY_APP = {
+    "androidx.appcompat",  # build.gradle.kts, for ChromeActivity's superclass
+    "androidx.core",       # build.gradle.kts, forced to Chromium's version
+}
+PROVIDED_LIST = "provided-r-fields.txt"
+
 JAVA_KEYWORDS = {
     "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char",
     "class", "const", "continue", "default", "do", "double", "else", "enum",
@@ -182,6 +199,7 @@ def main() -> int:
 
     # package -> resource type -> set of names
     wanted = collections.defaultdict(lambda: collections.defaultdict(set))
+    provided = set()
     for info in jar.infolist():
         if not info.filename.endswith(".class"):
             continue
@@ -191,7 +209,12 @@ def main() -> int:
             owner, _, res_type = class_name.partition("/R$")
             if "/" in res_type:
                 continue
-            wanted[owner.replace("/", ".")][res_type].add(field)
+            package = owner.replace("/", ".")
+            if package in PROVIDED_BY_APP:
+                if field not in JAVA_KEYWORDS:
+                    provided.add("%s.R$%s.%s" % (package, res_type, field))
+                continue
+            wanted[package][res_type].add(field)
 
     if not wanted:
         print("REFUSED: no R references found in the AAR's classes. Either the "
@@ -248,7 +271,13 @@ def main() -> int:
                   newline="\n") as handle:
             handle.write("\n".join(lines) + "\n")
 
+    with open(os.path.join(out_dir, PROVIDED_LIST), "w", encoding="utf-8",
+              newline="\n") as handle:
+        handle.write("".join(line + "\n" for line in sorted(provided)))
+
     print("  generated %d R classes, %d fields" % (len(wanted), total_fields))
+    print("  %d fields left to the app's own R (%s)"
+          % (len(provided), ", ".join(sorted(PROVIDED_BY_APP))))
     if missing:
         print("  %d referenced symbols are undefined in this build and were "
               "given zero, as Chromium's own R does" % missing)

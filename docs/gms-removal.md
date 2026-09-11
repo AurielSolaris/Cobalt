@@ -3,7 +3,9 @@
 Release gate 2 of 3. Where it stands: **started, 4 of 18 modules gone.**
 
 Decision: [0013](decisions/0013-remove-google-play-services.md).
-Order: [0014](decisions/0014-gms-removal-before-shell.md).
+Order: [0018](decisions/0018-shell-before-gms-removal.md) — after the shell,
+except where a dependency blocks it; within this work,
+[0014](decisions/0014-gms-removal-before-shell.md)'s sequence.
 
 ## How much is left, and how to know
 

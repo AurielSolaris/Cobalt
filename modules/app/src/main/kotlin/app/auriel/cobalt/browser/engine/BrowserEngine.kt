@@ -47,6 +47,17 @@ interface BrowserEngine {
     fun createSession(incognito: Boolean = false): EngineSession
 
     /**
+     * Puts [session] on screen, taking whichever session was there off it.
+     *
+     * A session is created off screen, and the shell calls this when a tab
+     * becomes the active one. For Chromium this is real work — one surface is
+     * shared by every tab, and a hidden `WebContents` lets its renderer be
+     * deprioritised. The document engine draws through Compose, where the shell
+     * already chooses what to draw, so it has nothing to do.
+     */
+    fun show(session: EngineSession) {}
+
+    /**
      * Releases everything the engine holds.
      *
      * Chromium's browser process outlives any single Activity, so an

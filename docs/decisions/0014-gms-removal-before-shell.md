@@ -1,6 +1,8 @@
 # 0014 — Remove Google Play Services before building Cobalt's shell
 
-**Status:** accepted
+**Status:** superseded by [0018](0018-shell-before-gms-removal.md) — the shell
+goes first; GMS comes out on encounter or after it. The measurements and the
+`chrome://extensions` check below still hold.
 **Date:** 2026-09-10
 **Depends on:** [0013](0013-remove-google-play-services.md), [0002](0002-shell-design.md)
 

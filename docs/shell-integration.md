@@ -424,15 +424,23 @@ spike of its own before anything is committed to:
    starts and a `WebContents` renders a real site into a Compose window. The JNI
    surface was a real problem and `enable_jni_multiplexing = false` was the
    whole fix; the separate `libcobalt` was neither a fix nor necessary.
-5. **Tab model in Kotlin** — a list of `WebContents`, create/close/switch,
-   behind the `BrowserEngine` seam in `modules/app/.../browser/engine/`, which
-   `DocumentEngine` already implements for the 0.1.0 pipeline.
+5. ~~**Tab model in Kotlin**~~ **Done** — verified on device (SM-M315F): a new
+   tab opens at the top while the old one keeps its scroll position across
+   switches, and input follows the tab on screen. Renderer processes go 3 → 4
+   on new and back to 3 on close, and closing the last tab leaves a fresh blank
+   one.
+   `browser/tabs/TabModel.kt`: create/close/switch over any `BrowserEngine`,
+   with the invariant that some tab is always active. The seam gained
+   `BrowserEngine.show(session)`; `ChromiumEngine` creates `WebContents` hidden
+   and moves the one shared `ContentViewRenderView` (and the input
+   `ContentView`) between them. `ChromiumPageActivity` drives it with
+   new/next/close buttons.
 6. **Bottom bar wired to it** — the four sections from 0002, with the address
    bar and `NavigationController`.
 7. **The surfaces that are not content**: extensions (a WebUI navigation),
    downloads, settings.
 8. **Incognito.**
 
-None of this blocks [gate 2](gms-removal.md), and gate 2 should still land first
-— 0014's ordering holds, and this document does not change it. It exists so the
-shell starts from measurements rather than from a blank page.
+The shell now goes first ([0018](decisions/0018-shell-before-gms-removal.md),
+superseding 0014's order). [Gate 2](gms-removal.md) work happens when a GMS
+dependency blocks the shell, and otherwise after it.

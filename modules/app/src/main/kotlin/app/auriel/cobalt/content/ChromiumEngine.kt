@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.chromium.components.embedder_support.view.ContentView
 import org.chromium.components.embedder_support.view.ContentViewRenderView
 import org.chromium.content_public.browser.LoadUrlParams
+import org.chromium.content_public.browser.Visibility
 import org.chromium.content_public.browser.WebContents
 import org.chromium.content_public.browser.WebContentsObserver
 import org.chromium.chrome.browser.content.WebContentsFactory
@@ -91,6 +92,9 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
 
     private var destroyed = false
 
+    /** The session attached to [renderView], if any. At most one ever is. */
+    private var shown: ChromiumSession? = null
+
     /**
      * The View to put on screen, with the page's own surface behind it.
      *
@@ -120,17 +124,33 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
         // session that records history.
         require(!incognito) { "incognito needs an off-the-record profile (0002)" }
 
+        // Hidden until show(): a tab opened in the background should not
+        // compete with the one on screen for the renderer's priority.
         val webContents = WebContentsFactory.createWebContents(
             ProfileManager.getLastUsedRegularProfile(),
-            /* initiallyHidden= */ false,
+            /* initiallyHidden= */ true,
             /* initializeRenderer= */ true,
         )
-        return ChromiumSession(webContents, renderView, window)
+        return ChromiumSession(webContents, renderView, window, onClosed = ::forget)
+    }
+
+    override fun show(session: EngineSession) {
+        check(!destroyed) { "engine is destroyed" }
+        require(session is ChromiumSession) { "not this engine's session: $session" }
+        if (session === shown) return
+        shown?.detach()
+        session.attach()
+        shown = session
+    }
+
+    private fun forget(session: ChromiumSession) {
+        if (session === shown) shown = null
     }
 
     override fun shutdown() {
         if (destroyed) return
         destroyed = true
+        shown = null
         renderView.destroy()
         window.destroy()
     }
@@ -141,7 +161,11 @@ private class ChromiumSession(
     private val webContents: WebContents,
     private val renderView: ContentViewRenderView,
     window: ActivityWindowAndroid,
+    private val onClosed: (ChromiumSession) -> Unit,
 ) : EngineSession {
+
+    private var attached = false
+    private var closed = false
 
     private val _state = MutableStateFlow(SessionState())
     override val state: StateFlow<SessionState> = _state.asStateFlow()
@@ -199,7 +223,21 @@ private class ChromiumSession(
             window,
             WebContents.createDefaultInternalsHolder(),
         )
+        publish()
+    }
 
+    /**
+     * Puts this tab on the shared surface. Only [ChromiumEngine.show] calls it,
+     * and it detaches the previous tab first.
+     *
+     * The `ContentView` moves with the tab rather than staying in the render
+     * view, because it is where input goes: two of them stacked would send a
+     * touch to whichever happened to be on top, not to the tab on screen.
+     */
+    fun attach() {
+        check(!closed) { "session is closed" }
+        if (attached) return
+        attached = true
         renderView.addView(
             contentView,
             FrameLayout.LayoutParams(
@@ -208,9 +246,16 @@ private class ChromiumSession(
             ),
         )
         renderView.setCurrentWebContents(webContents)
+        webContents.updateWebContentsVisibility(Visibility.VISIBLE)
         contentView.requestFocus()
+    }
 
-        publish()
+    /** Takes this tab off the surface. It keeps loading; it is not drawn. */
+    fun detach() {
+        if (!attached) return
+        attached = false
+        webContents.updateWebContentsVisibility(Visibility.HIDDEN)
+        renderView.removeView(contentView)
     }
 
     private fun publish(
@@ -255,8 +300,17 @@ private class ChromiumSession(
     }
 
     override fun close() {
+        if (closed) return
+        closed = true
         observer.observe(null)
-        renderView.removeView(contentView)
+        // Deliberately not detach(): that would tell a WebContents about to be
+        // destroyed that it is hidden, which is work for nothing. The surface
+        // keeps pointing at it until the next show(), and that is harmless only
+        // because the shell always shows another tab after closing one —
+        // TabModel's invariant is that some tab is always active.
+        if (attached) renderView.removeView(contentView)
+        attached = false
+        onClosed(this)
         // A WebContents is a renderer process. Dropping the reference and
         // waiting for a garbage collector to notice is not closing a tab.
         webContents.destroy()
