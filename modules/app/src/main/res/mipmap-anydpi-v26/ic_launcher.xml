@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The adaptive icon. tools/assets/make-icons.py has always generated the
+    foreground layer at every density, but nothing referenced it, and the
+    manifest named no icon at all: the launcher, recents and the Android 12+
+    launch splash all fell back to the stock Android icon.
+
+    The background is the mark's own dark ground (#0B0E14, branding/cobalt-icon.svg),
+    so the launcher's mask crops the same image the SVG draws.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/icon_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

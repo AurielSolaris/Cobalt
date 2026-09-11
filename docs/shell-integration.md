@@ -386,6 +386,64 @@ called. `export-aar.sh` now refuses when it is older than `libchrome.so`.
 the lifecycle listener it registers only sees Activities created afterwards —
 `Found untracked Activity` — and it asserts if called twice.
 
+## Closed: the shell runs on Chromium
+
+<p>
+  <img src="images/shell/page.png" width="180" alt="A page rendered by Chromium under Cobalt's toolbar">
+  <img src="images/shell/menu.png" width="180" alt="The options sheet">
+  <img src="images/shell/tabs.png" width="180" alt="The tab switcher with page previews">
+</p>
+
+`MainActivity` now runs Cobalt's own Compose interface over Chromium. The
+pieces:
+
+| Piece | What it does |
+|---|---|
+| `browser/engine/ShellEngine.kt` | The Activity-level half of the seam: start-up status, the page surface, capabilities (incognito, extensions URL), page capture. `ShellEngines.create` finds `ChromiumShellEngine` by name and falls back to the document engine, because `content/` is not compiled without the AAR. |
+| `browser/BrowserController.kt` | Replaces `BrowserViewModel`. Drives the screens from `TabModel`; owned by the Activity, because every session is bound to its window. |
+| `browser/BrowserApp.kt` | The page, then one toolbar. The page surface is composed **once**; home and placeholder sections are drawn over it, never instead of it. |
+| `browser/BrowserSheets.kt` | The options sheet and the tab switcher. |
+
+Verified on device (SM-M315F): typing an address, links, system Back, Forward
+from the sheet, reload/stop, opening links from other apps (`ACTION_VIEW`),
+new/switch/close tabs with previews, Extensions opening `chrome://extensions`
+with uBlock Origin listed and enabled, and the screenshot.
+
+### Things that were not obvious
+
+**Compose drawn over the page has to take the touches too.** An opaque layer
+over Chromium's surface hides the page, but without a pointer handler a touch
+passes through it to the `AndroidView` below, and the user taps a link they
+cannot see. `Covering` in `BrowserApp.kt` consumes every pointer event.
+
+**Chromium's page is not in the window.** The first screenshot saved a blank
+white image. On Android 10+ the GPU process presents through its own
+`SurfaceControl` layers, so a `PixelCopy` of the window misses them, and a
+`PixelCopy` of the `SurfaceView` finds nothing either:
+
+    W HWUI: Surface doesn't have any previously queued frames, nothing to readback from
+
+The page has to come from Chromium's compositor:
+`RenderWidgetHostView.writeContentBitmapToDiskAsync`, the only readback
+`content_public` offers outside tests. The tab previews use the same call,
+taken when a sheet opens, which is the last moment the tab is certainly on
+screen: a hidden `WebContents` has nothing to read back.
+
+**The launcher icon was never wired.** `tools/assets/make-icons.py` had always
+generated the adaptive foreground, but there was no adaptive-icon XML and the
+manifest named no icon. The launcher, recents and the Android 12+ splash all
+showed Android's stock icon on a white window. Both are fixed, and the launch
+window now uses the shell's own background, so start-up does not flash a
+different colour.
+
+### Found, not yet fixed
+
+- `chrome://extensions` renders at desktop width (`IS_DESKTOP_ANDROID`), so it
+  is legible only zoomed. The extension surfaces are step 7 anyway.
+- Typing words that are not an address shows "not a web address". Search needs
+  a default engine, and choosing one is a product decision, not a shell detail.
+- Incognito is visible but disabled until step 8.
+
 ## What is still genuinely unknown
 
 Everything above is a dependency-graph result. These are not, and each needs a
@@ -435,8 +493,9 @@ spike of its own before anything is committed to:
    and moves the one shared `ContentViewRenderView` (and the input
    `ContentView`) between them. `ChromiumPageActivity` drives it with
    new/next/close buttons.
-6. **Bottom bar wired to it** — the four sections from 0002, with the address
-   bar and `NavigationController`.
+6. ~~**The shell wired to it**~~ **Done**. See "Closed: the shell runs on
+   Chromium" below. The four-section bar from 0002 became one toolbar and two
+   sheets along the way (0002, amended).
 7. **The surfaces that are not content**: extensions (a WebUI navigation),
    downloads, settings.
 8. **Incognito.**

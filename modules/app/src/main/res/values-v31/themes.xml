@@ -1,0 +1,15 @@
+<resources>
+    <!--
+        Android 12+ draws a splash from the theme while the process starts.
+        Chromium's start-up makes that splash visible for longer than most apps,
+        so it carries the adaptive icon on the shell's own background and hands
+        over to Compose without a change of colour.
+    -->
+    <style name="Theme.Cobalt" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowSplashScreenBackground">@color/window_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>

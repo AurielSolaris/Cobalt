@@ -1,5 +1,6 @@
 package app.auriel.cobalt.browser
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,14 +10,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -28,19 +32,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * The tab switcher.
+ * The tab switcher: two columns of cards, each with a picture of its page.
  *
- * A list rather than a grid: on a phone the useful thing about a tab is its
- * title, and titles do not survive being cropped into a thumbnail. Grid previews
- * also mean rendering every tab off-screen, which is a cost Stage 7 can decide
- * to pay once there is a real renderer behind it.
+ * 0.1.0 used a plain list on the argument that titles are what identify a tab
+ * and do not survive cropping. That held while there was nothing to show; with
+ * a real renderer, the page's own look is how people actually find a tab, and
+ * the title is kept on each card for when it is not. Pictures come from
+ * [BrowserController.captureThumbnail]; a tab with none yet shows its icon.
  */
 @Composable
 fun TabsScreen(
@@ -50,6 +60,7 @@ fun TabsScreen(
     onCloseTab: (Long) -> Unit,
     onNewTab: (Boolean) -> Unit,
     onCloseAll: (Boolean) -> Unit,
+    incognitoAvailable: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -59,7 +70,7 @@ fun TabsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 10.dp),
+                .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -82,13 +93,15 @@ fun TabsScreen(
             }
         }
 
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(tabs, key = { it.id }) { tab ->
-                TabRow(
+                TabCard(
                     tab = tab,
                     isActive = tab.id == activeTabId,
                     onSelect = { onTabSelected(tab.id) },
@@ -97,8 +110,7 @@ fun TabsScreen(
             }
 
             if (incognitoCount > 0) {
-                item {
-                    Spacer(Modifier.height(4.dp))
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     TextButton(
                         onClick = { onCloseAll(true) },
                         modifier = Modifier.fillMaxWidth(),
@@ -109,69 +121,95 @@ fun TabsScreen(
             }
         }
 
-        NewTabActions(onNewTab = onNewTab)
+        NewTabActions(onNewTab = onNewTab, incognitoAvailable = incognitoAvailable)
     }
 }
 
 @Composable
-private fun TabRow(
+private fun TabCard(
     tab: Tab,
     isActive: Boolean,
     onSelect: () -> Unit,
     onClose: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    val borderColor = if (isActive) colors.primary else colors.outlineVariant
+    val shape = MaterialTheme.shapes.medium
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.surfaceVariant, MaterialTheme.shapes.medium)
-            .border(if (isActive) 1.5.dp else 1.dp, borderColor, MaterialTheme.shapes.medium)
-            .clickable(onClick = onSelect)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(shape)
+            .background(colors.surfaceVariant)
+            .border(if (isActive) 2.dp else 1.dp, if (isActive) colors.primary else colors.outlineVariant, shape)
+            .clickable(onClick = onSelect),
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .background(colors.surfaceContainerLowest, MaterialTheme.shapes.small),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = if (tab.incognito) Icons.Outlined.VisibilityOff else Icons.Outlined.Language,
                 contentDescription = null,
                 tint = if (tab.incognito) colors.primary else colors.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(14.dp),
             )
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(Modifier.weight(1f)) {
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = tab.displayTitle,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.labelMedium,
                 color = colors.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            Text(
-                text = tab.displaySubtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Close ${tab.displayTitle}",
+                    tint = colors.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
 
-        IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = "Close ${tab.displayTitle}",
-                tint = colors.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.8f)
+                .background(colors.surfaceContainerLowest),
+            contentAlignment = Alignment.Center,
+        ) {
+            val thumbnail = tab.thumbnail
+            if (thumbnail != null) {
+                val image = remember(thumbnail) { thumbnail.asImageBitmap() }
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                // No picture yet: a tab opened in the background, or one that
+                // has never been navigated. Its address stands in.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = if (tab.incognito) Icons.Outlined.VisibilityOff else Icons.Outlined.Language,
+                        contentDescription = null,
+                        tint = colors.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = tab.displaySubtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -182,9 +220,13 @@ private fun TabRow(
  * Incognito is normally buried in an overflow menu, which quietly makes the
  * private option the inconvenient one. Putting both on the same row costs a
  * button and removes that nudge.
+ *
+ * When the engine cannot do incognito yet, the button stays, dimmed, rather
+ * than vanishing: its place in the layout is a promise, and the label says
+ * when it is kept.
  */
 @Composable
-private fun NewTabActions(onNewTab: (Boolean) -> Unit) {
+private fun NewTabActions(onNewTab: (Boolean) -> Unit, incognitoAvailable: Boolean) {
     val colors = MaterialTheme.colorScheme
 
     Row(
@@ -202,11 +244,14 @@ private fun NewTabActions(onNewTab: (Boolean) -> Unit) {
             onClick = { onNewTab(false) },
         )
         ActionButton(
-            text = "Incognito",
+            text = if (incognitoAvailable) "Incognito" else "Incognito — soon",
             icon = Icons.Outlined.VisibilityOff,
             containerColor = colors.surfaceVariant,
             contentColor = colors.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .alpha(if (incognitoAvailable) 1f else 0.45f),
+            enabled = incognitoAvailable,
             onClick = { onNewTab(true) },
         )
     }
@@ -219,6 +264,7 @@ private fun ActionButton(
     containerColor: androidx.compose.ui.graphics.Color,
     contentColor: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
@@ -226,7 +272,7 @@ private fun ActionButton(
             .height(46.dp)
             .background(containerColor, MaterialTheme.shapes.medium)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {

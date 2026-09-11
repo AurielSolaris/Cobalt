@@ -2,6 +2,11 @@ package app.auriel.cobalt.content
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.File
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import app.auriel.cobalt.browser.engine.BrowserEngine
@@ -92,6 +97,31 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
 
     private var destroyed = false
 
+    /**
+     * The visible page, read back from Chromium's compositor.
+     *
+     * `writeContentBitmapToDiskAsync` is the only readback `content_public`
+     * offers outside tests, and it goes through a file. The file is temporary
+     * and deleted here; the shell decides where the image is kept.
+     */
+    suspend fun capture(session: EngineSession, scratchDir: File): Bitmap? {
+        val view = (session as ChromiumSession).hostView ?: return null
+        if (!view.isReady) return null
+        val file = File(scratchDir, "capture-${System.nanoTime()}.png")
+        val path = suspendCancellableCoroutine { continuation ->
+            view.writeContentBitmapToDiskAsync(
+                renderView.width,
+                renderView.height,
+                file.path,
+            ) { written -> continuation.resume(written) }
+        }
+        return try {
+            if (path.isNullOrEmpty()) null else BitmapFactory.decodeFile(path)
+        } finally {
+            file.delete()
+        }
+    }
+
     /** The session attached to [renderView], if any. At most one ever is. */
     private var shown: ChromiumSession? = null
 
@@ -166,6 +196,9 @@ private class ChromiumSession(
 
     private var attached = false
     private var closed = false
+
+    /** Null before the renderer has a view, which is briefly true of a new tab. */
+    val hostView get() = webContents.renderWidgetHostView
 
     private val _state = MutableStateFlow(SessionState())
     override val state: StateFlow<SessionState> = _state.asStateFlow()

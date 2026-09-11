@@ -38,12 +38,34 @@ for display text and document headings, mono for code. All three are variable
 fonts with the weight axis set explicitly, because synthetic bolding of a
 variable face smears the strokes.
 
-**Bottom bar: Home, Extensions, Tabs, Downloads.** Bookmarks were on the bar
-initially and were moved into the overflow menu at the top right. A bookmark is a
+**Bottom bar: Home, Extensions, Tabs, Downloads** *(0.1.0; superseded by the
+one-toolbar amendment below, which moved all four into the toolbar and its
+sheets)*. Bookmarks were on the bar initially and were moved into the overflow
+menu. A bookmark is a
 property of the page you are looking at, so the control belongs next to the
 address that identifies it, and saving one is a per-page action rather than a
 place you navigate to. That frees the slot for extensions — the feature Cobalt
 exists to bring back.
+
+**One toolbar, at the bottom; everything else in sheets** *(amended
+2026-09-11)*. 0.1.0 had the address bar at the top and a four-section bar at
+the bottom. Now there is one row under the page: the address (reload or stop
+inside it), the tab count, and ⋮. The tab switcher and the options menu are
+bottom sheets that rise from that row: page actions as tiles (new tab, forward,
+reload, screenshot), places as a list (home, extensions, downloads, bookmarks,
+settings). Nothing is drawn above the page and nothing floats over it. The
+reasons are less on screen competing with the page, and every control within a
+thumb's reach. While the keyboard is up, the toolbar rides above it.
+
+A floating action button was considered for home, tabs and reload, and
+rejected. It covers whatever part of the page is under it (consent banners and
+sites' own bottom navigation, in practice), and it would make the tab switcher,
+the most used control after the address, cost two taps instead of one.
+
+**The tab switcher shows page previews.** Two columns of cards, each with a
+picture of the page as it last looked and its title. 0.1.0 chose a list because
+titles do not survive cropping; with a real renderer, the page's look is how
+people find a tab, and the title stays on the card.
 
 **No shortcut grid, no trending list.** Concept designs for this screen usually
 carry both. Both are advertising surfaces: shortcut tiles are sold placements, and a trending feed

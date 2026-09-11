@@ -1,0 +1,9 @@
+<resources>
+    <!-- The mark's ground, from branding/cobalt-icon.svg. -->
+    <color name="icon_background">#FF0B0E14</color>
+
+    <!-- The first frame, before Compose draws: the shell's own background
+         (Theme.kt, OneLight / OneDark), so launch does not flash a different
+         colour on its way to the interface. -->
+    <color name="window_background">#FFFAFAFA</color>
+</resources>

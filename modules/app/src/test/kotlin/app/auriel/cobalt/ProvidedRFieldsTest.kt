@@ -13,14 +13,16 @@ import kotlin.test.assertTrue
  * would otherwise surface as a `NoSuchFieldError` deep inside Chromium, on
  * device, at whatever moment that resource is first touched.
  *
- * Passes vacuously without the AAR: then there is no Chromium code to read them.
+ * Skips without the AAR: then there is no Chromium code to read them.
  */
 class ProvidedRFieldsTest {
 
     @Test
     fun everySkippedFieldExistsInTheAppsR() {
+        // Both, not just the list: the list is generated and outlives the AAR
+        // it came from, and without the AAR the build carries no Chromium R.
         val list = File("src/chromium/r/provided-r-fields.txt")
-        if (!list.exists()) return
+        if (!list.exists() || !File("libs/cobalt-content.aar").exists()) return
 
         val missing = list.readLines().filter { it.isNotBlank() }.filterNot { ref ->
             val owner = ref.substringBeforeLast('.')

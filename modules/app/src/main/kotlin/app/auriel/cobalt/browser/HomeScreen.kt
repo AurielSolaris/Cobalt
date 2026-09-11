@@ -59,7 +59,7 @@ fun HomeContent(
         Spacer(Modifier.height(14.dp))
 
         Text(
-            text = "Type an address above to load a page.",
+            text = "Type an address below to load a page.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

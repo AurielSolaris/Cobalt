@@ -1,5 +1,6 @@
 package app.auriel.cobalt.browser
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -20,27 +21,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
@@ -48,27 +43,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.auriel.cobalt.render.DocumentRenderer
 
 /**
- * The address bar.
+ * The browser's only toolbar: one row at the bottom of the screen.
  *
- * A single row: a scheme indicator, the address, a reload-or-stop action, and
- * the overflow menu.
+ * The address (with reload or stop inside it), the tab count, and ⋮. That is
+ * all that stays on screen, by choice: less competing with the page, and all
+ * of it under the thumb. Back is the system gesture; everything else is one
+ * tap away in the menu sheet.
  */
 @Composable
 fun AddressBar(
     text: String,
     isLoading: Boolean,
     incognito: Boolean,
+    tabCount: Int,
+    tabsOpen: Boolean,
     onTextChanged: (String) -> Unit,
     onGo: () -> Unit,
     onReload: () -> Unit,
     onStop: () -> Unit,
-    onOpenBookmarks: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onTabs: () -> Unit,
+    onMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -91,16 +88,17 @@ fun AddressBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .background(colors.surfaceContainerLow)
+            .padding(start = 10.dp, end = 2.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             modifier = Modifier
                 .weight(1f)
-                .height(42.dp)
+                .height(44.dp)
                 .background(colors.surfaceVariant, MaterialTheme.shapes.medium)
                 .border(1.dp, colors.outlineVariant, MaterialTheme.shapes.medium)
-                .padding(horizontal = 10.dp),
+                .padding(start = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SchemeIndicator(text = text, incognito = incognito)
@@ -136,72 +134,55 @@ fun AddressBar(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+
+            // Inside the field: it acts on the address, and it costs the row
+            // no width of its own.
+            if (text.isNotEmpty()) {
+                IconButton(onClick = if (isLoading) onStop else onReload, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = if (isLoading) Icons.Filled.Close else Icons.Filled.Refresh,
+                        contentDescription = if (isLoading) "Stop" else "Reload",
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
         }
 
-        IconButton(onClick = if (isLoading) onStop else onReload) {
+        IconButton(onClick = onTabs) {
+            TabCountIcon(count = tabCount, selected = tabsOpen)
+        }
+
+        IconButton(onClick = onMenu) {
             Icon(
-                imageVector = if (isLoading) Icons.Filled.Close else Icons.Filled.Refresh,
-                contentDescription = if (isLoading) "Stop" else "Reload",
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = "Menu",
                 tint = colors.onSurfaceVariant,
             )
         }
-
-        OverflowMenu(
-            onOpenBookmarks = onOpenBookmarks,
-            onOpenSettings = onOpenSettings,
-        )
     }
 }
 
-/**
- * The menu at the top right.
- *
- * Bookmarks live here rather than on the bottom bar. A bookmark is a property of
- * the page you are looking at, so the control belongs next to the address that
- * identifies it — and saving one is a per-page action, not a place you navigate
- * to. That leaves the bar for the four things that are places: home, extensions,
- * tabs, and downloads.
- */
+/** The tab-count square, which is the switcher's icon in every browser. */
 @Composable
-private fun OverflowMenu(
-    onOpenBookmarks: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val colors = MaterialTheme.colorScheme
+private fun TabCountIcon(count: Int, selected: Boolean) {
+    val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Box {
-        IconButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
-                contentDescription = "More",
-                tint = colors.onSurfaceVariant,
+    Box(modifier = Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 1.5.dp.toPx()
+            drawRect(
+                color = color,
+                topLeft = Offset(stroke / 2, stroke / 2),
+                size = Size(size.width - stroke, size.height - stroke),
+                style = Stroke(width = stroke),
             )
         }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = colors.surfaceContainerHigh,
-            shape = MaterialTheme.shapes.medium,
-        ) {
-            DropdownMenuItem(
-                text = { Text("Bookmarks") },
-                leadingIcon = { Icon(Icons.Outlined.BookmarkBorder, contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onOpenBookmarks()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Settings") },
-                leadingIcon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
-                onClick = {
-                    expanded = false
-                    onOpenSettings()
-                },
-            )
-        }
+        Text(
+            text = if (count > 99) "99+" else count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+        )
     }
 }
 
@@ -230,57 +211,6 @@ private fun SchemeIndicator(text: String, incognito: Boolean) {
         tint = tint,
         modifier = Modifier.size(16.dp),
     )
-}
-
-/** The content area: home page, loading, document, or error. */
-@Composable
-fun PageContent(
-    tab: Tab,
-    onLinkClicked: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier.fillMaxSize()) {
-        when (val content = tab.content) {
-            Content.Home -> HomeContent(incognito = tab.incognito)
-
-            is Content.Loading -> LoadingMessage(host = content.url.host)
-
-            is Content.Loaded -> DocumentRenderer(
-                document = content.document,
-                onLinkClick = onLinkClicked,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            is Content.Failed -> CenteredMessage(
-                headline = content.error.headline,
-                detail = content.error.detail,
-                headlineColor = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
-}
-
-@Composable
-private fun LoadingMessage(host: String) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(26.dp),
-            color = MaterialTheme.colorScheme.primary,
-            strokeWidth = 2.dp,
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(
-            text = host,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
 }
 
 @Composable

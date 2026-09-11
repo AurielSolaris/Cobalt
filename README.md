@@ -138,15 +138,15 @@ Building from `nightly` right now gives you **Chromium 140 with Cobalt's engine
 work**: extensions on Android, MV2 and MV3, uBlock Origin preinstalled and
 blocking, the extra search engines, and Cobalt's name and icons throughout.
 
-**You do not get Cobalt's own shell.** The UI is still Chromium's Android
-front-end wearing Cobalt's branding — its toolbar, its tab switcher, its
-settings. The Kotlin/Compose shell with the bottom bar
-([decision 0002](docs/decisions/0002-shell-design.md)) is not wired to the engine
-yet; `./gradlew` builds it as a standalone 0.1.0 chassis that does not embed
-Chromium. Replacing the Chromium shell is one of the three gates before a
-`stable` release, along with uBlock Origin (**done**) and removing Google Play
-Services ([decision 0013](docs/decisions/0013-remove-google-play-services.md),
-not started). See [`docs/branching.md`](docs/branching.md).
+**The APK that build produces still has Chromium's Android front-end**, wearing
+Cobalt's branding: its toolbar, its tab switcher, its settings. Cobalt's own
+shell (below) now runs on that same engine, but as a separate Gradle app that
+consumes Chromium as an AAR, and it is not yet the APK Cobalt ships. Replacing
+the Chromium shell is one of the three gates before a `stable` release, along
+with uBlock Origin (**done**) and removing Google Play Services
+([decision 0013](docs/decisions/0013-remove-google-play-services.md)), which now
+follows the shell ([decision 0018](docs/decisions/0018-shell-before-gms-removal.md)).
+See [`docs/branching.md`](docs/branching.md).
 
 ---
 
@@ -179,28 +179,47 @@ a post-1.0 experiment behind a build flag that is off by default; see Stage 12 o
 project plan. The engine interface in `:modules:core` is kept engine-neutral so that
 experiment stays possible, and for no other reason.
 
-## The 0.1.0 shell
+## Cobalt's shell
 
-Cobalt is two programs until Stage 6 joins them. The Chromium tree above is what
-installs and browses today; the Compose shell below is the chassis its UI will be
-rebuilt from, and it still runs against its own bring-up renderer.
+<table>
+  <tr>
+    <td><img src="docs/images/shell/home.png" width="160" alt="A new tab: the Cobalt wordmark, and the one toolbar at the bottom"></td>
+    <td><img src="docs/images/shell/page.png" width="160" alt="A Wikipedia article rendered by Chromium, toolbar at the bottom"></td>
+    <td><img src="docs/images/shell/menu.png" width="160" alt="The options sheet risen from the toolbar"></td>
+    <td><img src="docs/images/shell/tabs.png" width="160" alt="The tab switcher sheet, a grid of cards with page previews"></td>
+    <td><img src="docs/images/shell/extensions.png" width="160" alt="chrome://extensions in a tab, uBlock Origin enabled"></td>
+  </tr>
+  <tr>
+    <td align="center">New tab</td>
+    <td align="center">A page</td>
+    <td align="center">⋮ options</td>
+    <td align="center">Tabs</td>
+    <td align="center">Extensions</td>
+  </tr>
+</table>
 
-**Milestone 0.1.0 works**: type an address, and the page is fetched, parsed,
-and rendered on device. Links navigate. Tabs and incognito tabs work.
+Kotlin and Compose, running Chromium underneath: Blink renders every page
+shown here. Everything sits at the bottom of the screen, where a thumb already
+is. There is one toolbar with the address, the tab count and ⋮, and nothing
+drawn above or floating over the page. The tab switcher and the options menu are
+sheets that rise from that toolbar and go away when you're done
+([decision 0002](docs/decisions/0002-shell-design.md)).
 
-What is real today:
+What works, on device:
 
-- Address bar with URL normalization — a bare host always becomes `https`, never `http`
-- Fetching over http(s) with redirects, charset detection, and typed, readable errors
-- A tolerant HTML parser that never throws on malformed markup
-- A renderer covering headings, paragraphs, inline emphasis, links, lists, `<pre>`,
-  block quotes, rules, and image alt text
-- In-memory tabs, a tab switcher, and incognito tabs
-- One Dark interface, blue accent, near-square corners
+- Typing an address, links, back (the system gesture) and forward, reload and stop
+- Tabs: open, switch, close, with page previews in the switcher
+- **Extensions** opens `chrome://extensions`, with uBlock Origin installed and blocking
+- A screenshot of the visible page from the ⋮ sheet, saved to `Pictures/Cobalt`
+- Opening links from other apps
 
-What is deliberately not there yet: CSS, JavaScript execution, images, history,
-bookmarks, downloads, and extensions. The renderer is a bring-up shim with a scheduled
-deletion date — Blink replaces it in Stage 6, once the Chromium tree builds.
+Not there yet: downloads, bookmarks, settings and incognito, which have their
+places in the interface and say so. How the shell reaches Chromium, and every
+problem that took, is in [`docs/shell-integration.md`](docs/shell-integration.md).
+
+Without a Chromium build to export from, `./gradlew` builds the same shell on
+the 0.1.0 document engine: an OkHttp fetcher, a tolerant HTML parser and a
+Compose renderer, enough to browse simple pages and to run in unit tests.
 
 The roadmap is in [`docs/roadmap.md`](docs/roadmap.md); design and engine decisions,
 including the ones that were rejected, are in [`docs/decisions/`](docs/decisions).
@@ -222,7 +241,7 @@ on a guess — so both say what they cost and let you choose.
 |---|---|
 | `:modules:core` | URL handling, HTTP fetching, text decoding, the JS engine interface |
 | `:modules:engine` | HTML tokenizer and tree builder, the stub JS engine |
-| `:modules:app` | Android Compose shell — chrome, tabs, address bar, renderer |
+| `:modules:app` | Android Compose shell — toolbar, sheets, tab model, both engines |
 
 ## Building
 
