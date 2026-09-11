@@ -11,6 +11,8 @@
 #
 #   kiwi   <patch-name>       apply patches/kiwi-105/<name>.patch via apply-batch.sh
 #   tool   <script> [args]    run a script from tools/, relative to the repo root
+#   backport <repo> <CVE>     apply patches/security/<CVE>.diff inside <repo>
+#                             (a path under $SRC, "." for src) -- all or nothing
 #   note   <text>             printed, does nothing -- section headings
 #
 # $SRC expands to the Chromium checkout. Every tool must be idempotent: the
@@ -143,6 +145,11 @@ tool patches/cobalt-content-view-render-view.py $SRC
 # content_shell_apk, the only target that ever built it, does not enable lint.
 tool patches/cobalt-lint-content-view-render-view.py $SRC
 
+# A WebContentsDelegate for tabs Chrome's TabAndroid does not own. Without one,
+# Chromium refuses every download (DownloadRequestLimiter treats a missing
+# delegate as "no") and has nowhere to ask about new windows or fullscreen.
+tool patches/cobalt-webcontents-delegate.py $SRC
+
 
 # Chromium cannot compile Compose (its kotlinc has no plugin support), so
 # Cobalt's interface is built in the Gradle project and Chromium arrives as an
@@ -172,3 +179,22 @@ tool patches/cobalt-extension-auto-reload.py $SRC
 #
 # They are real work in progress, not dead code, but the shipped build is
 # Route B and adding them here would break a fresh checkout.
+
+note ===== Security backports (decision 0016, docs/backporting.md) =====
+
+# Upstream security fixes, adapted to M140. Each file in patches/security/
+# names its CVE, Chromium bug, upstream commit and branch, and what the
+# adaptation changed. The record of what was taken, deferred and why is
+# docs/security-backports.md.
+#
+# 0.4.1 -- from Chrome 152.0.7977.75 and 153.0.8010.36 (September 2026).
+backport third_party/angle CVE-2026-87488
+backport .                 CVE-2026-87628
+backport .                 CVE-2026-84324
+backport v8                CVE-2026-84326
+backport third_party/dawn  CVE-2026-84333
+backport .                 CVE-2026-85043
+backport .                 CVE-2026-85048
+backport third_party/skia  CVE-2026-85049
+backport .                 CVE-2026-85051
+backport .                 CVE-2026-85052

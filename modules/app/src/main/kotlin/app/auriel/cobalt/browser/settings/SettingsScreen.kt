@@ -49,6 +49,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.outlined.Search
+import app.auriel.cobalt.browser.search.SearchEngine
+import app.auriel.cobalt.browser.search.SearchStore
 import app.auriel.cobalt.ui.theme.Palette
 import app.auriel.cobalt.ui.theme.ThemeMode
 import app.auriel.cobalt.ui.theme.ThemeStore
@@ -61,6 +64,7 @@ private sealed interface Page {
     data object Theme : Page
     data class Edit(val palette: Palette, val isNew: Boolean) : Page
     data object About : Page
+    data object Search : Page
 }
 
 /**
@@ -106,6 +110,22 @@ fun SettingsScreen(about: AboutInfo, onClose: () -> Unit, onOpen: (String) -> Un
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            val engine by SearchStore.engine.collectAsState()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { page = Page.Search }
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(18.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Search engine", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                    Text(engine.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -124,6 +144,8 @@ fun SettingsScreen(about: AboutInfo, onClose: () -> Unit, onOpen: (String) -> Un
         }
 
         Page.About -> AboutScreen(about, onBack = { page = Page.Root }, onOpen = open)
+
+        Page.Search -> SearchEngineScreen(onBack = { page = Page.Root })
 
         Page.Theme -> ThemeScreen(
             onBack = { page = Page.Root },
@@ -318,6 +340,43 @@ internal fun shareTheme(context: Context, palette: Palette) {
         ?.setPrimaryClip(ClipData.newPlainText(palette.name, text))
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
     context.startActivity(Intent.createChooser(send, "Share ${palette.name}"))
+}
+
+/**
+ * The search engine the address bar uses for anything that is not an address.
+ * Each shows the host a search goes to: which company receives the query is
+ * the whole question, so it is stated rather than implied by a logo.
+ */
+@Composable
+private fun SearchEngineScreen(onBack: () -> Unit) {
+    val current by SearchStore.engine.collectAsState()
+    val colors = MaterialTheme.colorScheme
+    Screen("Search engine", onBack = onBack) {
+        for (engine in SearchEngine.entries) {
+            val selected = engine == current
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { SearchStore.set(engine) }
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.RadioButton(selected = selected, onClick = { SearchStore.set(engine) })
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(engine.label, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface)
+                    Text(engine.host, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                }
+            }
+        }
+        Text(
+            "Anything you type that is not a web address is sent to this engine. " +
+                "Start with ? to search for something that looks like an address.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+        )
+    }
 }
 
 // --- Building blocks shared by the settings pages ---------------------------

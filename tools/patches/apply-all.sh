@@ -114,6 +114,38 @@ while IFS= read -r line || [ -n "$line" ]; do
             failed=$((failed+1)); FAILED+=("tool $script")
         fi
         ;;
+    backport)
+        # "backport <repo> <CVE>" -- an upstream security fix adapted to M140,
+        # from patches/security/<CVE>.diff, applied inside <repo> (a path under
+        # $SRC, "." for src itself; V8, ANGLE, Skia and Dawn are separate git
+        # repositories). Decision 0016: a backport that silently fails to apply
+        # reports as fixed, which is worse than a missing one, so this is
+        # all-or-nothing: already applied, applied whole, or a failure.
+        # read, not ${rest#* }: the series aligns these in columns.
+        read -r sub cve <<< "$rest"
+        patch="$REPO/patches/security/${cve}.diff"
+        dir="$SRC/$sub"
+        if [ ! -f "$patch" ]; then
+            printf '  %-58s MISSING\n' "$cve"
+            failed=$((failed+1)); FAILED+=("backport $cve"); continue
+        fi
+        if [ "$CHECK" = 1 ]; then
+            printf '  %-58s would apply in %s\n' "$cve" "$sub"
+            continue
+        fi
+        if git -C "$dir" apply --reverse --check "$patch" 2>/dev/null; then
+            printf '  %-58s already applied\n' "$cve"
+            ok=$((ok+1))
+        elif git -C "$dir" apply --check "$patch" 2>/dev/null \
+             && git -C "$dir" apply "$patch"; then
+            printf '  %-58s applied (%s)\n' "$cve" "$sub"
+            ok=$((ok+1))
+        else
+            printf '  %-58s DOES NOT APPLY in %s\n' "$cve" "$sub"
+            git -C "$dir" apply --check "$patch" 2>&1 | sed 's/^/      /'
+            failed=$((failed+1)); FAILED+=("backport $cve")
+        fi
+        ;;
     *)
         echo "  unknown entry kind: $kind" >&2
         failed=$((failed+1)); FAILED+=("$line")

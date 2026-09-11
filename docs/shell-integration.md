@@ -470,6 +470,62 @@ Compose, so under Solarized Light they stayed white on cream until
 `CobaltTheme` set them from the palette. Only the app-wide theme does this: the
 editor's preview must not recolour the real status bar.
 
+### 0.4.1: downloads, PDFs, search
+
+**Downloads needed a `WebContentsDelegate`, and nothing said so.** A download
+link did nothing at all: no file, no error, no log line. Chromium's
+`DownloadRequestLimiter::CanDownload` refuses any download from a
+`WebContents` whose delegate is null, and a bare `WebContents` has none, because
+Chrome's `Tab` normally supplies it. `tools/patches/cobalt-webcontents-delegate.py`
+adds a small JNI bridge, `CobaltWebContentsDelegate`, that attaches the stock
+`web_contents_delegate_android::WebContentsDelegateAndroid` to a tab's
+`WebContents`. `content/CobaltDelegate.kt` is the Kotlin half, and also routes
+`target=_blank` links into Cobalt's own tab model. The delegate must be detached
+before the `WebContents` is destroyed.
+
+Two more things stood between that and a file on disk:
+
+- Chrome asks where to save the first download, through a dialog only
+  `ChromeActivity` can show. Cobalt sets Chromium's own
+  `PROMPT_FOR_DOWNLOAD_ANDROID` pref to `DONT_SHOW`, the value Chrome stores for
+  "don't ask again". Files go to the phone's Downloads folder.
+- Safe Browsing's download check reads a Custom Tabs session token, so every
+  download crashed with `NoClassDefFoundError: CustomTabsSessionToken` until
+  `androidx.browser` was added (1.8.0; later versions need a newer AGP).
+
+The shell lists downloads through `OfflineContentProvider`, the interface
+Chrome's Downloads page reads (`content/ChromiumDownloads.kt`). Removing one
+from the list is Chromium's `removeItem`, which **deletes the file**. So the
+button is red and asks first. Files are opened with other apps through their
+MediaStore content URI, since Cobalt has no FileProvider.
+
+The address bar shows the committed URL, or the one being loaded while a
+navigation is pending. A download never commits, so it no longer leaves the
+download's URL in the bar.
+
+**PDFs open in pdf.js**, which is bundled like uBlock Origin (see
+[`ublock-bundling.md`](ublock-bundling.md#pdfjs)). Cobalt declares itself a PDF
+viewer to Android through an activity alias, `.PdfViewer`, enabled only in
+builds with Chromium. Chromium on Android only lets `file://` read external
+storage or the app's own Downloads directories, so a PDF arriving as a
+`content://` URI is first copied to `getExternalFilesDir(DIRECTORY_DOWNLOADS)/pdf`
+(`browser/LocalPdf.kt`). A PDF on the phone, or the pdf.js viewer showing one,
+is `Security.Local`: a green lock that says the file is on this device.
+
+**Search from the address bar.** Anything that is not an address goes to the
+chosen engine: DuckDuckGo by default, or Google (Settings → Search engine,
+`browser/search/Search.kt`).
+
+**One user agent.** The document engine's OkHttp loader used to send Cobalt's
+own UA string. `UserAgent` now takes Chromium's
+(`ContentUtils.getBrowserUserAgent()`) at startup, so both engines send the
+same, reduced, Chromium 140 UA with nothing added.
+
+<p>
+  <img src="images/shell/downloads.png" width="180" alt="The Downloads page">
+  <img src="images/shell/pdf.png" width="180" alt="A PDF in pdf.js, with the green lock popup">
+</p>
+
 ### Found, not yet fixed
 
 - **`chrome://credits` is Chromium's placeholder**: "This is sample credits
@@ -478,8 +534,6 @@ editor's preview must not recolour the real status bar.
   it. That is a distribution blocker, not a cosmetic one: Chromium's
   components' licences require the attributions to ship. The fix is the
   `args.gn` flag and a Chromium rebuild.
-- Typing words that are not an address shows "not a web address". Search needs
-  a default engine, and choosing one is a product decision, not a shell detail.
 - Incognito is visible but disabled until step 8.
 
 ## What is still genuinely unknown
@@ -503,7 +557,7 @@ spike of its own before anything is committed to:
   through interfaces Chrome's Android layer implements. This is the same
   question `gn path` answered twice; it needs asking per subsystem rather than
   once.
-- **Downloads, permissions prompts, and the intent surface** — none of which
+- **Permissions prompts** (downloads and the intent surface are done, 0.4.1) — none of which
   `content_shell` implements, because it is a test harness. These are Cobalt's
   to write, and they are not small.
 - **Incognito**, which 0002 gives a dedicated surface, needs an off-the-record

@@ -134,6 +134,16 @@ tools/build/build-chromium.sh gen                # write args.gn, run gn gen
 tools/build/build-chromium.sh build              # autoninja the APK
 ```
 
+Before the patch step, the bundled extensions need to exist under
+`/opt/cobalt/vendor`: uBlock Origin, and pdf.js, which is built from source by
+`tools/assets/build-pdfjs.sh`. It downloads and verifies its own Node, so
+nothing from the host's package manager is involved.
+
+`tools/build/export-aar.sh` then copies the AAR into the Gradle app. It refuses
+a stale export by checking content: every `*Jni` proxy in the AAR must have its
+entry in the generated `GEN_JNI`, apart from four that are known to be absent
+and never called.
+
 `tools/monitor/sync-progress.sh` and `tools/monitor/build-progress.sh` report progress; neither
 touches the checkout.
 

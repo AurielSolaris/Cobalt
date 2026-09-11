@@ -58,6 +58,13 @@ interface BrowserEngine {
     fun show(session: EngineSession) {}
 
     /**
+     * Where a page's request for a new tab goes: a link with `target=_blank`,
+     * a middle click, `window.open` without an opener. The shell opens a tab
+     * in its own model; an engine that cannot ask simply never calls this.
+     */
+    fun setNewTabHandler(handler: (url: String) -> Unit) {}
+
+    /**
      * Releases everything the engine holds.
      *
      * Chromium's browser process outlives any single Activity, so an
@@ -152,6 +159,11 @@ enum class Security {
     None,
     /** The browser's own page (`chrome://`), never sent over a network. */
     Internal,
+    /**
+     * A file on the phone, or a bundled extension's page showing one (the
+     * pdf.js viewer). No network was involved, so "not secure" would be a lie.
+     */
+    Local,
     /** Valid certificate, nothing insecure on the page. */
     Secure,
     /** Plain http, or https with insecure content mixed in. */

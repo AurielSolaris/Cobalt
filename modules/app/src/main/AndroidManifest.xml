@@ -114,6 +114,31 @@
         </activity>
 
         <!--
+            Cobalt as a PDF viewer: the entry Android lists in its "open with"
+            chooser for PDFs, from Files, messaging apps, and Cobalt's own
+            Downloads. MainActivity copies the file where the bundled pdf.js can
+            read it and opens it in a tab (browser/LocalPdf.kt).
+
+            An alias so it can be switched off per build: enabled only when the
+            app carries Chromium and therefore pdf.js. The document engine
+            cannot display a PDF, and must not tell Android it can.
+        -->
+        <activity-alias
+            android:name=".PdfViewer"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="${pdfViewer}"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity-alias>
+
+        <!--
             The page spike. One tab, one URL, rendered by Chromium. Not
             exported, like the startup spike: it is a development surface, and
             an exported activity that loads whatever URL it is handed is a way

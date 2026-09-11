@@ -34,7 +34,7 @@ class OkHttpPageLoader(
     override suspend fun load(url: Url): FetchResult = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url.toString())
-            .header("User-Agent", UserAgent.VALUE)
+            .header("User-Agent", UserAgent.value)
             .header("Accept", UserAgent.ACCEPT)
             .header("Accept-Language", "en-US,en;q=0.9")
             .get()

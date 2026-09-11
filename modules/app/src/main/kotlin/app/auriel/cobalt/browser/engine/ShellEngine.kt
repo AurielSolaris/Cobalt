@@ -69,6 +69,16 @@ interface ShellEngine {
      */
     suspend fun capturePage(session: EngineSession): Bitmap? = null
 
+    /** The engine's downloads, once it is ready; null if this engine has none. */
+    val downloads: DownloadsSource? get() = null
+
+    /**
+     * Whether this engine displays PDFs itself. Chromium does, through the
+     * bundled pdf.js; the document engine does not, and a PDF goes to another
+     * app instead.
+     */
+    val opensPdfs: Boolean get() = false
+
     fun destroy()
 }
 

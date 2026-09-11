@@ -326,3 +326,33 @@ static.doubleclick.net is blocked  /  ERR_BLOCKED_BY_CLIENT
   **already belongs to the uBO bundling patch** and was silently clobbered. The
   component now owns `chrome/browser/cobalt/extension_recovery/` instead, so
   the two patches cannot collide and neither depends on series order.
+
+## pdf.js
+
+Since 0.4.1 the same machinery bundles a second extension:
+[pdf.js](https://github.com/mozilla/pdf.js), Mozilla's PDF viewer, in its
+Chromium extension build (MV3). `tools/patches/cobalt-bundle-ublock.py` stages
+both CRXs and writes both into the force-install policy, so pdf.js also cannot be
+uninstalled, only disabled.
+
+- **Built from source, pinned.** `tools/assets/build-pdfjs.sh` checks out tag
+  `v6.3.289` and runs `npm ci` and `npx gulp chromium` with a vendored,
+  checksum-verified Node 22. The CRX is signed with Cobalt's own key
+  (`/opt/cobalt/vendor/keys/pdfjs.pem`), which fixes the extension id at
+  `lpjhbfidilobajgdoikmgconolfgdlcl`. **Losing that key changes the id**, and
+  the installed copy would no longer be updated.
+- **How PDFs reach it.** pdf.js uses a `declarativeNetRequest` rule on response
+  headers to redirect PDF responses into its viewer. Attachments
+  (`Content-Disposition: attachment`) stay downloads.
+- **Local files need file access.** Extensions do not get `file://` access
+  unless the user turns it on. The bundling patch grants it to this one id at
+  install (`extension_registrar.cc`, `crx_installer.cc`), and only when no
+  setting exists yet, so turning it off sticks.
+- **Telemetry is off.** The Chromium build of pdf.js pings `pdfjs.robwu.nl`
+  once a day. The extension's own `disableTelemetry` managed-storage policy
+  turns that off, set through `POLICY_DOMAIN_EXTENSIONS` in the same policy
+  provider.
+
+Verified on device: a PDF from a website opens in the viewer, a downloaded PDF
+opens from the Downloads page, and another app's "open with" lists Cobalt.
+

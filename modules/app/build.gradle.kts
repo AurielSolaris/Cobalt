@@ -23,8 +23,8 @@ android {
         // org.chromium.build.BuildConfig.MIN_SDK_VERSION must match this.
         minSdk = 29
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.4.1"
 
         // Which Application class the manifest names.
         //
@@ -38,6 +38,10 @@ android {
         manifestPlaceholders["applicationClass"] =
             if (hasChromium) "app.auriel.cobalt.content.CobaltApplication"
             else "android.app.Application"
+
+        // Whether Android is told Cobalt opens PDFs (the .PdfViewer alias). Only
+        // with Chromium, which carries the bundled pdf.js.
+        manifestPlaceholders["pdfViewer"] = hasChromium.toString()
     }
 
     buildFeatures {
@@ -237,6 +241,21 @@ dependencies {
         // Only under `hasChromium`: without the AAR nothing references it, and
         // the document-engine build should not carry a library it never loads.
         implementation("androidx.appcompat:appcompat:1.7.0")
+
+        // AndroidX Browser (Custom Tabs), for the same reason and found the
+        // same way: at runtime. Safe Browsing's download check asks which app
+        // referred the download, and that goes through Chrome's IntentHandler,
+        // which reads a Custom Tabs session token:
+        //
+        //   NoClassDefFoundError: androidx/browser/customtabs/CustomTabsSessionToken
+        //     at IntentHandler.getReferrerUrl
+        //     at SafeBrowsingReferringAppBridge.getReferringAppInfo
+        //
+        // Every download crashed the browser here, once downloads got that far
+        // (0.4.1). Chromium builds against a 1.10.0 CI snapshot; 1.10.0 itself needs
+        // AGP 8.9.1 (so does 1.9.0) and this project is on 8.7.3, so 1.8.0; the
+        // class has been there since 1.0.
+        implementation("androidx.browser:browser:1.8.0")
     }
 
     implementation(project(":modules:core"))

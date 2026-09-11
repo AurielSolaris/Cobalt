@@ -69,6 +69,8 @@ fun BrowserApp(
     certificate: () -> CertificateSummary?,
     about: AboutInfo,
     onOpenInNewTab: (String) -> Unit,
+    downloadActions: DownloadActions,
+    onDismissDownloadNotice: () -> Unit,
 ) {
     val tab = state.activeTab
     var sheet by remember { mutableStateOf<Sheet?>(null) }
@@ -97,10 +99,11 @@ fun BrowserApp(
                     when {
                         state.section != Section.Home -> Covering {
                             SectionScreen(
-                                section = state.section,
+                                state = state,
                                 about = about,
                                 onClose = { onSectionSelected(Section.Home) },
                                 onOpen = onOpenInNewTab,
+                                downloadActions = downloadActions,
                             )
                         }
 
@@ -113,6 +116,16 @@ fun BrowserApp(
 
                         !tab.hasPage -> Covering { HomeContent(incognito = tab.incognito) }
                     }
+                }
+
+                val notice = state.downloadNotice
+                if (notice != null && state.section != Section.Downloads) {
+                    DownloadNotice(
+                        entry = notice,
+                        onView = { onSectionSelected(Section.Downloads) },
+                        onOpen = { downloadActions.onOpen(notice.id) },
+                        onDismiss = onDismissDownloadNotice,
+                    )
                 }
 
                 if (tab.isLoading && state.section == Section.Home) {
@@ -209,9 +222,16 @@ private fun Covering(content: @Composable () -> Unit) {
 
 /** The places that are not pages yet. Back, or any tab, returns to the page. */
 @Composable
-private fun SectionScreen(section: Section, about: AboutInfo, onClose: () -> Unit, onOpen: (String) -> Unit) {
-    when (section) {
+private fun SectionScreen(
+    state: BrowserState,
+    about: AboutInfo,
+    onClose: () -> Unit,
+    onOpen: (String) -> Unit,
+    downloadActions: DownloadActions,
+) {
+    when (state.section) {
         Section.Settings -> SettingsScreen(about = about, onClose = onClose, onOpen = onOpen)
+        Section.Downloads -> DownloadsScreen(state.downloads, downloadActions)
 
         Section.Home, Section.Tabs -> Unit
 
@@ -227,11 +247,6 @@ private fun SectionScreen(section: Section, about: AboutInfo, onClose: () -> Uni
             title = "Bookmarks",
             detail = "Bookmarks arrive on top of Chromium's own store. " +
                 "Cobalt would rather show nothing than a list that forgets itself.",
-        )
-
-        Section.Downloads -> ComingLater(
-            title = "Downloads",
-            detail = "Downloads are the next part of the shell to be built.",
         )
     }
 }

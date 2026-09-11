@@ -124,11 +124,26 @@ Preinstalled uBlock Origin is **not** on this list. It mitigates the drive-by
 delivery path; it does not fix a bug, and it must never be cited as a reason to
 skip a backport.
 
+## The mechanics, as built in 0.4.1
+
+- **Finding the fix.** A merge onto a release branch keeps the original `Bug:`
+  line, so reading the Gitiles JSON log of the release branches (`chromium/src`
+  `branch-heads/<n>`; ANGLE and Dawn `chromium/<n>`; Skia `chrome/m<nnn>`; V8
+  `branch-heads/<major.minor>` from chromiumdash) and matching bug ids finds
+  the commit without fetching history. 24 of 25 were found that way.
+- **Adapting.** Each adapted patch is generated from exact "replace this with
+  that" edits against the M140 file, each of which must match exactly once, so
+  an edit written against the wrong context fails instead of landing somewhere
+  else. The result goes to `patches/security/<CVE>.diff` with a provenance
+  header.
+- **Landing.** `backport <repo> <CVE>` in `tools/patches/series.txt`. The kind
+  is all-or-nothing: already applied, applied whole, or a loud failure.
+
 ## Not yet built
 
-- **The published backport record.** 0016 requires one — which CVEs, which
-  upstream commits, which release — and calls an unfalsifiable security claim
-  worth nothing. The `security` label is a start, not that record.
+- **Closing the loop on GitHub.** The record exists
+  ([`security-backports.md`](security-backports.md)); the issues are not yet
+  closed from it automatically.
 - **Fork release-watching.** The script reads commits, not releases. An
   out-of-band fork release that only bumps its Chromium base is 0017's sharpest
   signal and is currently invisible to it.

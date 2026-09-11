@@ -95,18 +95,44 @@ JNI_DEST="$REPO/modules/app/src/chromium/java"
 #   org_chromium_components_embedder_1support_view_ContentViewRenderView_init
 #   in class Lorg/jni_zero/GEN_JNI;
 #
-# So it is compared against the library it has to match.
-if [ -f "$JNI_SRCJAR" ] && [ "$SRC/$OUT/libchrome.so" -nt "$JNI_SRCJAR" ]; then
-    echo "  STALE: $JNI_SRCJAR is older than libchrome.so" >&2
-    echo "  The registration and the library must be generated from the same" >&2
-    echo "  Java. Rebuild it:" >&2
-    echo "    autoninja -C $OUT -j 6 chrome/android:libchrome__jni_registration" >&2
-    exit 1
-fi
-
+# So the registration is checked against the AAR's Java, by content.
+#
+# It used to compare timestamps (srcjar older than libchrome.so = stale). That
+# is wrong in the normal case: a full build generates the registration first
+# and links the library after it, so the srcjar is *always* older, and 0.4.1's
+# first clean build was refused with a registration that was complete. What
+# must hold is that every class in the AAR with native methods is registered.
+# jni_zero generates a `<Class>Jni` proxy for each, so each proxy found in the
+# AAR must have its class named in GEN_JNI.
 if [ ! -f "$JNI_SRCJAR" ]; then
     echo "  MISSING: $JNI_SRCJAR" >&2
     echo "  build it:  autoninja -C $OUT chrome/android:libchrome__jni_registration" >&2
+    exit 1
+fi
+if ! python3 - "$AAR" "$JNI_SRCJAR" <<'PYEOF'
+import io, re, sys, zipfile
+aar, srcjar = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(aar) as a:
+    jar = zipfile.ZipFile(io.BytesIO(a.read("classes.jar")))
+    proxies = {n[:-len("Jni.class")].split("/")[-1]
+               for n in jar.namelist()
+               if n.endswith("Jni.class") and "$" not in n}
+with zipfile.ZipFile(srcjar) as s:
+    gen = "".join(s.read(n).decode("utf-8", "replace") for n in s.namelist())
+# Unregistered by design, and in every build that has run: their natives are
+# not in libchrome (jni_zero stubs them), or, for Linker, belong to the linker
+# library's own registration. Anything else unregistered is a real gap.
+KNOWN = {"BackgroundSyncBackgroundTaskScheduler", "CaptivePortalHelper", "Linker", "MessagePayload"}
+missing = sorted(p for p in proxies - KNOWN if not re.search(r"_" + re.escape(p) + r"_", gen))
+if missing:
+    print(f"  STALE: {len(missing)} native classes in the AAR are not registered, e.g. "
+          + ", ".join(missing[:5]), file=sys.stderr)
+    sys.exit(1)
+print(f"  registration covers all {len(proxies)} native classes in the AAR")
+PYEOF
+then
+    echo "  The registration and the AAR must be generated from the same Java." >&2
+    echo "  Rebuild it:  autoninja -C $OUT -j 6 chrome/android:libchrome__jni_registration" >&2
     exit 1
 fi
 rm -rf "$JNI_DEST"

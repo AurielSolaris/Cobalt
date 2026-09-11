@@ -56,6 +56,14 @@ there needed two upstream gaps closed: MV2's `browserAction` schema was not buil
 for Android at all, and `webNavigation` was excluded from `desktop_android`. Both
 are now ported. See [`docs/ublock-bundling.md`](docs/ublock-bundling.md).
 
+**Ten security fixes are backported (0.4.1).** Of the 25 CVEs the security
+watch filed against 140, ten were adapted from current stable and are applied by
+the build: in ANGLE (WebGL), V8, Dawn, Skia, the compositor, the network
+stack, Cast and crash reporting. Each has its
+upstream commit, its patch file and the reason the other fifteen were not taken
+(not reachable on this build, or deferred) in
+[`docs/security-backports.md`](docs/security-backports.md).
+
 In progress: porting the rest of Kiwi's patch set. Two of its patches have been
 **refused** rather than ported, one of which had disabled a security check
 ([decision 0011](docs/decisions/0011-refuse-mechanical-disablers.md)).
@@ -136,7 +144,7 @@ Full instructions, host requirements and the ccache setup are in
 
 Building from `nightly` right now gives you **Chromium 140 with Cobalt's engine
 work**: extensions on Android, MV2 and MV3, uBlock Origin preinstalled and
-blocking, the extra search engines, and Cobalt's name and icons throughout.
+blocking, pdf.js as the PDF viewer, the extra search engines, and Cobalt's name and icons throughout.
 
 **The APK that build produces still has Chromium's Android front-end**, wearing
 Cobalt's branding: its toolbar, its tab switcher, its settings. Cobalt's own
@@ -210,6 +218,14 @@ experiment stays possible, and for no other reason.
     <td align="center">Theme editor</td>
     <td align="center">About</td>
   </tr>
+  <tr>
+    <td><img src="docs/images/shell/downloads.png" width="160" alt="Downloads: a finished PDF, with a red delete button"></td>
+    <td><img src="docs/images/shell/pdf.png" width="160" alt="A downloaded PDF in pdf.js, the green lock's popup saying the file is on the phone"></td>
+  </tr>
+  <tr>
+    <td align="center">Downloads</td>
+    <td align="center">A PDF, in pdf.js</td>
+  </tr>
 </table>
 
 Shown in Cobalt, the default dark theme, except where marked. Screenshots are
@@ -236,9 +252,19 @@ What works, on device:
   phone by choosing colours, and share them as text
   ([decision 0007](docs/decisions/0007-user-themes.md))
 - Settings → About: version, engine, source and licences
+- **Search** from the address bar: DuckDuckGo by default, or Google, chosen in
+  Settings → Search engine. Anything that is not an address is a search
+- **Downloads**, through Chromium's own download system: into the phone's
+  Downloads folder, with a notice when one finishes and a Downloads page to
+  pause, resume, cancel, open or delete them. Deleting removes the file, so it
+  is red and asks first
+- **PDFs open in the browser**, in [pdf.js](https://github.com/mozilla/pdf.js),
+  bundled the way uBlock Origin is. Cobalt also offers itself as a PDF viewer to
+  other apps, and a PDF on the phone gets a green lock: nothing came over a
+  network, so there is no one else's certificate to doubt
+- The user agent is Chromium's own, reduced, with nothing added
 
-Not there yet: downloads, bookmarks, search from the address bar, custom
-fonts and incognito. They have their places in the interface and say so. How the shell reaches Chromium, and every
+Not there yet: bookmarks, history, custom fonts and incognito. They have their places in the interface and say so. How the shell reaches Chromium, and every
 problem that took, is in [`docs/shell-integration.md`](docs/shell-integration.md).
 
 Without a Chromium build to export from, `./gradlew` builds the same shell on

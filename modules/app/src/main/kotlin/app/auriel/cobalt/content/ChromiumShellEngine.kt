@@ -8,6 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
 import app.auriel.cobalt.browser.engine.BrowserEngine
+import app.auriel.cobalt.browser.engine.DownloadsSource
+import app.auriel.cobalt.core.net.UserAgent
+import org.chromium.chrome.browser.content.ContentUtils
 import app.auriel.cobalt.browser.engine.EngineSession
 import app.auriel.cobalt.browser.engine.ShellEngine
 import app.auriel.cobalt.core.net.Url
@@ -30,6 +33,12 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
     override val status: StateFlow<ShellEngine.Status> = _status.asStateFlow()
 
     private var chromium: ChromiumEngine? = null
+    private var chromiumDownloads: ChromiumDownloads? = null
+
+    override val downloads: DownloadsSource? get() = chromiumDownloads
+
+    /** pdf.js is bundled (tools/patches/cobalt-bundle-ublock.py). */
+    override val opensPdfs: Boolean get() = true
 
     override val engine: BrowserEngine
         get() = checkNotNull(chromium) { "the browser process is not running yet" }
@@ -49,6 +58,10 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
                 when (state) {
                     ChromiumStartup.State.Ready -> if (chromium == null) {
                         chromium = ChromiumEngine(activity)
+                        chromiumDownloads = ChromiumDownloads(activity.applicationContext)
+                        // The shell's own requests send exactly what Chromium
+                        // sends; see UserAgent.
+                        UserAgent.syncFrom(ContentUtils.getBrowserUserAgent())
                         _status.value = ShellEngine.Status.Ready
                     }
                     is ChromiumStartup.State.Failed -> _status.value =
@@ -85,6 +98,8 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
         (engine as ChromiumEngine).capture(session, activity.cacheDir)
 
     override fun destroy() {
+        chromiumDownloads?.destroy()
+        chromiumDownloads = null
         chromium?.shutdown()
         chromium = null
     }

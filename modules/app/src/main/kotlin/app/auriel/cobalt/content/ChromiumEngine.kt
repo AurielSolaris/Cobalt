@@ -31,6 +31,7 @@ import org.chromium.content_public.browser.LoadUrlParams
 import org.chromium.content_public.browser.Visibility
 import org.chromium.content_public.browser.WebContents
 import org.chromium.content_public.browser.WebContentsObserver
+import org.chromium.chrome.browser.cobalt.CobaltWebContentsDelegate
 import org.chromium.chrome.browser.content.WebContentsFactory
 import org.chromium.chrome.browser.profiles.ProfileManager
 import org.chromium.ui.base.ActivityWindowAndroid
@@ -170,7 +171,11 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
             /* initiallyHidden= */ true,
             /* initializeRenderer= */ true,
         )
-        return ChromiumSession(webContents, renderView, window, onClosed = ::forget)
+        return ChromiumSession(
+            webContents, renderView, window,
+            onClosed = ::forget,
+            onNewTab = { url -> newTabHandler?.invoke(url) },
+        )
     }
 
     override fun show(session: EngineSession) {
@@ -184,6 +189,12 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
 
     private fun forget(session: ChromiumSession) {
         if (session === shown) shown = null
+    }
+
+    private var newTabHandler: ((String) -> Unit)? = null
+
+    override fun setNewTabHandler(handler: (url: String) -> Unit) {
+        newTabHandler = handler
     }
 
     override fun shutdown() {
@@ -204,6 +215,7 @@ private class ChromiumSession(
     private val renderView: ContentViewRenderView,
     window: ActivityWindowAndroid,
     private val onClosed: (ChromiumSession) -> Unit,
+    private val onNewTab: (String) -> Unit,
 ) : EngineSession {
 
     private var attached = false
@@ -282,6 +294,9 @@ private class ChromiumSession(
             window,
             WebContents.createDefaultInternalsHolder(),
         )
+        // The WebContentsDelegate: without one Chromium refuses downloads and
+        // has nowhere to send new-tab requests. See CobaltDelegate.
+        CobaltWebContentsDelegate.attach(webContents, CobaltDelegate(onNewTab))
         publish()
     }
 
@@ -323,7 +338,7 @@ private class ChromiumSession(
     ) {
         val controller = webContents.navigationController
         _state.value = SessionState(
-            url = webContents.visibleUrl?.spec?.takeIf { it.isNotEmpty() },
+            url = shownUrl(progress)?.spec?.takeIf { it.isNotEmpty() },
             title = webContents.title?.takeIf { it.isNotEmpty() },
             progress = progress,
             canGoBack = controller?.canGoBack() ?: false,
@@ -333,10 +348,24 @@ private class ChromiumSession(
         )
     }
 
+    /**
+     * The address to show: the page being loaded while something is loading,
+     * otherwise the page that actually committed.
+     *
+     * Not simply `visibleUrl`. A navigation that turns into a download never
+     * commits, but in a fresh tab Chromium keeps it as the pending entry, so
+     * after every download the address bar showed the file's URL, marked
+     * insecure, over a blank page. Once loading stops, only what committed is
+     * true.
+     */
+    private fun shownUrl(progress: Float = _state.value.progress) =
+        if (progress < 1f) webContents.visibleUrl else webContents.lastCommittedUrl
+
     private fun security(): Security {
-        val url = webContents.visibleUrl ?: return Security.None
+        val url = shownUrl() ?: return Security.None
         if (url.isEmpty) return Security.None
         if (url.scheme == "chrome" || url.scheme == "about") return Security.Internal
+        if (url.scheme == "file" || url.scheme == "chrome-extension") return Security.Local
         return when (SecurityStateModel.getSecurityLevelForWebContents(webContents)) {
             ConnectionSecurityLevel.SECURE -> Security.Secure
             ConnectionSecurityLevel.DANGEROUS -> Security.Dangerous
@@ -412,6 +441,10 @@ private class ChromiumSession(
         if (attached) renderView.removeView(contentView)
         attached = false
         onClosed(this)
+        // The delegate goes first: it holds a pointer to this WebContents and
+        // unhooks itself when destroyed, which is only safe while the
+        // WebContents still exists (tools/patches/cobalt-webcontents-delegate.py).
+        CobaltWebContentsDelegate.detach(webContents)
         // A WebContents is a renderer process. Dropping the reference and
         // waiting for a garbage collector to notice is not closing a tab.
         webContents.destroy()

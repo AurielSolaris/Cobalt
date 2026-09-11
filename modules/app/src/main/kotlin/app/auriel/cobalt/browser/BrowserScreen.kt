@@ -35,6 +35,10 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import app.auriel.cobalt.browser.engine.CertificateSummary
 import app.auriel.cobalt.browser.engine.Security
 import app.auriel.cobalt.ui.theme.JetBrainsMono
+import app.auriel.cobalt.ui.theme.activePalette
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -137,9 +142,26 @@ fun AddressBar(
                         maxLines = 1,
                     )
                 }
+                // A TextFieldValue, not a String, so the selection is ours to
+                // set: tapping the bar selects the whole address, as every
+                // browser does, so typing replaces it rather than landing in
+                // the middle of it.
+                var field by remember { mutableStateOf(TextFieldValue(text)) }
+                var focused by remember { mutableStateOf(false) }
+                if (field.text != text) {
+                    field = TextFieldValue(text, selection = TextRange(text.length))
+                }
+                LaunchedEffect(focused) {
+                    // After the tap that focused the field has placed its cursor,
+                    // which would otherwise undo the selection in the same frame.
+                    if (focused) field = field.copy(selection = TextRange(0, field.text.length))
+                }
                 BasicTextField(
-                    value = text,
-                    onValueChange = onTextChanged,
+                    value = field,
+                    onValueChange = {
+                        field = it
+                        if (it.text != text) onTextChanged(it.text)
+                    },
                     singleLine = true,
                     textStyle = LocalTextStyle.current.merge(
                         TextStyle(
@@ -154,7 +176,7 @@ fun AddressBar(
                         autoCorrectEnabled = false,
                     ),
                     keyboardActions = KeyboardActions(onGo = { commit() }),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
                 )
             }
 
@@ -237,6 +259,9 @@ private fun SecurityIndicator(
         security == Security.NotSecure -> Triple(Icons.Outlined.Warning, colors.error, "Not secure")
         incognito -> Triple(Icons.Outlined.VisibilityOff, colors.primary, "Incognito")
         security == Security.Internal -> Triple(Icons.Outlined.Info, colors.onSurfaceVariant, "Cobalt page")
+        // Green: the source is this device, so there is no one else's
+        // certificate to doubt. What the file itself does is the file's business.
+        security == Security.Local -> Triple(Icons.Outlined.Lock, activePalette().success, "File on this phone")
         else -> Triple(Icons.Outlined.Lock, colors.onSurfaceVariant, "Secure")
     }
     val tappable = !typing && security != Security.None
@@ -269,7 +294,13 @@ private fun SecurityIndicator(
 @Composable
 private fun SecurityDetails(security: Security, pageUrl: String?, cert: CertificateSummary?) {
     val colors = MaterialTheme.colorScheme
-    val host = pageUrl?.substringAfter("://")?.substringBefore('/')
+    val host = when {
+        // A bundled extension's id is not something a person can read; for
+        // local files the useful fact is what is showing it.
+        pageUrl?.startsWith("chrome-extension://") == true -> "pdf.js viewer"
+        pageUrl?.startsWith("file://") == true -> pageUrl.substringAfterLast('/')
+        else -> pageUrl?.substringAfter("://")?.substringBefore('/')
+    }
     val (headline, explanation) = when (security) {
         Security.Secure -> "Connection is secure" to
             "Information you send or receive is private between you and this site. " +
@@ -280,6 +311,9 @@ private fun SecurityDetails(security: Security, pageUrl: String?, cert: Certific
         Security.Dangerous -> "This site is not safe" to
             "Its certificate is not valid, or it has been reported as harmful. " +
             "Someone may be pretending to be this site."
+        Security.Local -> "This file is on your phone" to
+            "It was opened from this device, not received over a network, so there is " +
+            "no one else's certificate to check."
         Security.Internal -> "This is a Cobalt page" to
             "It is part of the browser and is not sent over any network."
         Security.None -> "" to ""
@@ -290,7 +324,11 @@ private fun SecurityDetails(security: Security, pageUrl: String?, cert: Certific
             headline,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = if (security == Security.Secure || security == Security.Internal) colors.onSurface else colors.error,
+            color = when (security) {
+                Security.Local -> activePalette().success
+                Security.Secure, Security.Internal -> colors.onSurface
+                else -> colors.error
+            },
         )
         if (host != null) {
             Text(host, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)

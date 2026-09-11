@@ -1,47 +1,43 @@
 package app.auriel.cobalt.core.net
 
+import kotlin.concurrent.Volatile
+
 /**
- * The user agent Cobalt sends.
+ * The user agent Cobalt's own Kotlin code sends: the document engine's fetches,
+ * and anything else the shell requests itself.
  *
- * Cobalt is a Chromium browser and says so. This is not a disguise: Blink
- * renders the pages and V8 runs the scripts from Stage 6 onward, so a server
- * that branches on the Chrome token gets exactly the engine it is branching for.
- * A novel token would only earn Cobalt a bot challenge or a 2005 fallback page
- * for no benefit to anyone.
+ * **It is Chromium's, exactly.** Cobalt is Chromium underneath, and a site must
+ * see one browser, not two: before this, Chromium sent its reduced UA while
+ * OkHttp appended a `Cobalt/0.1.0` token, so the same person looked like
+ * different browsers depending on which code path made the request, which is
+ * itself a fingerprint. Now the Chromium engine sets [value] from
+ * `ContentUtils.getBrowserUserAgent()` as soon as it starts, and nothing here
+ * keeps its own opinion.
  *
- * The `Cobalt/<version>` product is appended rather than substituted, in the
- * same way Edge and Brave identify themselves. Sniffers that look for Chrome
- * still find it; anyone who wants to know which browser this actually is can
- * read to the end of the string.
- *
- * ### Keeping it honest
- *
- * [CHROMIUM_VERSION] must track the Chromium the app is actually built from.
- * Until Stage 6 there is no Blink behind it, which is the one period where this
- * string promises slightly more than it delivers — 0.1.0 fetches with OkHttp and
- * renders a structural subset through Compose. It is stated here rather than
- * quietly glossed over, and it stops being true the moment the real engine lands.
- *
- * Chromium's own reduced user agent freezes the platform as `Android 10; K` to
- * cut fingerprinting surface; Cobalt matches that rather than leaking the real
- * device and OS build.
+ * Until then (and in builds without Chromium) the default is the same string
+ * Chromium 140 produces: its reduced UA, which freezes the platform as
+ * `Android 10; K` and the version as `140.0.0.0` to cut fingerprinting surface.
+ * Decision 0016: the version stays truthful to the tree Cobalt is built from.
  */
 object UserAgent {
 
-    /**
-     * The Chromium milestone Cobalt reports. Updated with every rebase in
-     * Stage 5 — a user agent that drifts behind the engine it describes is worse
-     * than no user agent at all.
-     */
+    /** The Chromium milestone Cobalt is built from, as the reduced UA reports it. */
     const val CHROMIUM_VERSION = "140.0.0.0"
 
-    /** Cobalt's own version, appended as a distinct product token. */
-    const val COBALT_VERSION = "0.1.0"
-
-    /** The full `User-Agent` header value. */
-    const val VALUE: String =
+    /** What Chromium 140's reduced user agent is on Android. */
+    const val DEFAULT: String =
         "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) " +
-            "Chrome/$CHROMIUM_VERSION Mobile Safari/537.36 Cobalt/$COBALT_VERSION"
+            "Chrome/$CHROMIUM_VERSION Mobile Safari/537.36"
+
+    /** The `User-Agent` header value; the engine's own string once it has started. */
+    @Volatile
+    var value: String = DEFAULT
+        private set
+
+    /** Called by the Chromium engine with the string it actually sends. */
+    fun syncFrom(engineUserAgent: String) {
+        if (engineUserAgent.isNotBlank()) value = engineUserAgent
+    }
 
     /**
      * The `Accept` header for a navigation. Mirrors what Chrome sends, for the

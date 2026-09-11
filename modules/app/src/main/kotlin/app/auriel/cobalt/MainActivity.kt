@@ -1,6 +1,8 @@
 package app.auriel.cobalt
 
 import android.content.Intent
+import app.auriel.cobalt.browser.LocalPdf
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -22,6 +24,8 @@ import androidx.lifecycle.lifecycleScope
 import app.auriel.cobalt.browser.BrowserApp
 import app.auriel.cobalt.browser.BrowserController
 import app.auriel.cobalt.browser.CenteredMessage
+import app.auriel.cobalt.browser.DownloadActions
+import app.auriel.cobalt.browser.search.SearchStore
 import app.auriel.cobalt.browser.Screenshot
 import app.auriel.cobalt.browser.engine.ShellEngine
 import app.auriel.cobalt.browser.engine.ShellEngines
@@ -49,12 +53,17 @@ class MainActivity : ComponentActivity() {
      */
     private var pendingUrl by mutableStateOf<String?>(null)
 
+    /** A PDF another app asked Cobalt to open, waiting like [pendingUrl]. */
+    private var pendingPdf by mutableStateOf<Uri?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         ThemeStore.init(this)
+        SearchStore.init(this)
         pendingUrl = urlFrom(intent)
+        pendingPdf = pdfFrom(intent)
         shell = ShellEngines.create(this)
         lifecycleScope.launch {
             shell.status.first { it == ShellEngine.Status.Ready }
@@ -74,6 +83,12 @@ class MainActivity : ComponentActivity() {
                 pendingUrl?.let { url ->
                     current.navigateTo(url)
                     pendingUrl = null
+                }
+            }
+            LaunchedEffect(pendingPdf) {
+                pendingPdf?.let { uri ->
+                    openPdf(uri)
+                    pendingPdf = null
                 }
             }
 
@@ -100,6 +115,22 @@ class MainActivity : ComponentActivity() {
                 certificate = { current.session(state.activeTabId).certificate() },
                 about = AboutInfo(engineName = shell.engineName, creditsUrl = shell.creditsUrl),
                 onOpenInNewTab = current::openInNewTab,
+                downloadActions = DownloadActions(
+                    onPause = { current.onPauseDownload(it) },
+                    onResume = { current.onResumeDownload(it) },
+                    onCancel = { current.onCancelDownload(it) },
+                    onRemove = { current.onRemoveDownload(it) },
+                    onOpen = { id ->
+                        val uri = current.downloadUri(id)
+                        if (shell.opensPdfs && uri != null && current.downloadIsPdf(id)) {
+                            // A PDF opens here, in pdf.js, not in another app.
+                            openPdf(uri)
+                        } else if (!current.onOpenDownload(id)) {
+                            Toast.makeText(this, "No app on this phone can open that file", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                ),
+                onDismissDownloadNotice = current::onDismissDownloadNotice,
             )
         }
     }
@@ -141,6 +172,32 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingUrl = urlFrom(intent)
+        pendingPdf = pdfFrom(intent)
+    }
+
+    /**
+     * A local PDF, handed over through the "Cobalt" entry Android shows in its
+     * open-with list (the PDF activity-alias in the manifest). Web addresses
+     * that happen to end in .pdf go through [urlFrom] like any page.
+     */
+    private fun pdfFrom(intent: Intent?): Uri? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        val data = intent.data ?: return null
+        if (data.scheme != "content" && data.scheme != "file") return null
+        return data.takeIf { LocalPdf.isPdf(intent.type, it) }
+    }
+
+    /** Copies the PDF where pdf.js can read it and opens it in a new tab. */
+    private fun openPdf(uri: Uri) {
+        val current = controller ?: return
+        lifecycleScope.launch {
+            val fileUrl = LocalPdf.stage(this@MainActivity, uri)
+            if (fileUrl == null) {
+                Toast.makeText(this@MainActivity, "Could not open that PDF", Toast.LENGTH_SHORT).show()
+            } else {
+                current.openLocalFile(fileUrl)
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -152,6 +209,10 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun urlFrom(intent: Intent?): String? =
-        if (intent?.action == Intent.ACTION_VIEW) intent.dataString else null
+    /** A web address handed over by another app; local files are [pdfFrom]'s. */
+    private fun urlFrom(intent: Intent?): String? {
+        if (intent?.action != Intent.ACTION_VIEW) return null
+        val scheme = intent.data?.scheme ?: return null
+        return intent.dataString.takeIf { scheme == "http" || scheme == "https" }
+    }
 }

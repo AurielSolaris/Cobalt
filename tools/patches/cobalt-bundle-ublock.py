@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
-"""Bundle uBlock Origin into the APK as a preinstalled, disableable extension.
+"""Bundle Cobalt's extensions into the APK: uBlock Origin and pdf.js.
+
+Both are preinstalled and disableable, through the same three mechanisms below.
+pdf.js (Mozilla's "PDF Viewer", built from source by tools/assets/build-pdfjs.sh)
+gets two things uBlock does not:
+
+  - **File access**, granted at install to its id only, because opening a
+    local PDF means opening a file:// URL and the viewer refuses without it.
+    It is written only if no setting exists, so a user who turns it off keeps
+    that choice.
+  - **Its telemetry turned off**, through the extension's own managed-policy
+    schema (`disableTelemetry`), so the signed extension stays unmodified.
+    Unprompted, it would report the extension and browser version to
+    pdfjs.robwu.nl daily, and Cobalt does not make calls nobody asked for.
+
+The file keeps its original name so the series and the docs that cite it stay
+valid; it has bundled more than uBlock since 0.4.1.
 
 Three separate mechanisms have to line up, and none of them is a Kiwi patch --
 this is all upstream machinery configured for Android:
@@ -51,6 +67,11 @@ CRX = Path(sys.argv[2] if len(sys.argv) > 2 else "/opt/cobalt/vendor/ublock/ublo
 # that key changes the id, which would orphan every installed copy.
 UBLOCK_ID = "fimbmjialkbnbbedhcpdodbhicmjfgli"
 UBLOCK_VERSION = "1.74.0"
+
+PDFJS_CRX = Path(sys.argv[3] if len(sys.argv) > 3 else "/opt/cobalt/vendor/pdfjs/pdfjs.crx")
+# Derived from /opt/cobalt/vendor/keys/pdfjs.pem, as uBlock's is from its key.
+PDFJS_ID = "lpjhbfidilobajgdoikmgconolfgdlcl"
+PDFJS_VERSION = "6.3.0"
 UPDATE_URL = "https://updates.cobalt.auriel/crx/update.xml"
 
 ASSET_DIR = SRC / "chrome/browser/cobalt/extensions"
@@ -88,18 +109,18 @@ def write(path: Path, body: str) -> str:
 # ---------------------------------------------------------------- 1. asset
 
 
-def stage_crx() -> str:
-    if not CRX.exists():
-        raise Failed(f"missing CRX: {CRX} -- run tools/assets/pack-crx.py first")
-    magic = CRX.read_bytes()[:4]
+def stage_crx(src: Path = CRX, name: str = "ublock.crx") -> str:
+    if not src.exists():
+        raise Failed(f"missing CRX: {src} -- run tools/assets/pack-crx.py first")
+    magic = src.read_bytes()[:4]
     if magic != b"Cr24":
-        raise Failed(f"{CRX} is not a CRX (magic {magic!r})")
+        raise Failed(f"{src} is not a CRX (magic {magic!r})")
 
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
-    dest = ASSET_DIR / "ublock.crx"
-    if dest.exists() and dest.read_bytes() == CRX.read_bytes():
+    dest = ASSET_DIR / name
+    if dest.exists() and dest.read_bytes() == src.read_bytes():
         return "unchanged"
-    shutil.copy2(CRX, dest)
+    shutil.copy2(src, dest)
     return f"copied ({dest.stat().st_size} bytes)"
 
 
@@ -119,7 +140,10 @@ import("//build/config/android/rules.gni")
 # stored uncompressed. A CRX is a signed zip, so storing it uncompressed costs
 # essentially nothing anyway.
 android_assets("bundled_extension_assets") {
-  sources = [ "ublock.crx" ]
+  sources = [
+    "pdfjs.crx",
+    "ublock.crx",
+  ]
   disable_compression = true
 }
 """
@@ -195,11 +219,12 @@ struct BundledExtension {
 
 constexpr auto kBundledExtensions = std::to_array<BundledExtension>({
     {"assets/ublock.crx", "ublock.crx", "%(ublock_id)s", "%(ublock_version)s"},
+    {"assets/pdfjs.crx", "pdfjs.crx", "%(pdfjs_id)s", "%(pdfjs_version)s"},
 });
 
 // Bumped when the staged set changes, so an upgrade restages rather than
 // leaving an older CRX in place next to a newer manifest.
-constexpr char kStampContents[] = "%(ublock_version)s";
+constexpr char kStampContents[] = "ublock-%(ublock_version)s+pdfjs-%(pdfjs_version)s";
 
 bool CopyAssetToFile(std::string_view asset_path, const base::FilePath& dest) {
   base::MemoryMappedFile::Region region;
@@ -279,7 +304,8 @@ void StageBundledExtensions() {
 }
 
 }  // namespace cobalt
-""" % {"ublock_id": UBLOCK_ID, "ublock_version": UBLOCK_VERSION}
+""" % {"ublock_id": UBLOCK_ID, "ublock_version": UBLOCK_VERSION,
+       "pdfjs_id": PDFJS_ID, "pdfjs_version": PDFJS_VERSION}
 
 
 # ------------------------------------------------------- 3. policy provider
@@ -350,6 +376,7 @@ namespace {
 // ordinary user-removable extension, which is the failure decision 0006 is
 // about.
 constexpr char kUBlockOriginId[] = "%(ublock_id)s";
+constexpr char kPdfJsId[] = "%(pdfjs_id)s";
 
 // normal_installed refuses to parse without a valid update URL. Nothing fetches
 // this today -- the local CRX installs at kExternalPref, which outranks the
@@ -358,15 +385,19 @@ constexpr char kUBlockOriginId[] = "%(ublock_id)s";
 // update endpoint once bundled versions need refreshing without a full release.
 constexpr char kCobaltUpdateUrl[] = "%(update_url)s";
 
-base::Value BuildExtensionSettings() {
-  base::Value::Dict ublock;
+base::Value::Dict Bundled() {
+  base::Value::Dict entry;
   // kRecommended: MustRemainInstalled is true, MustRemainEnabled is false.
   // force_installed would also block disabling, which decision 0006 rejected.
-  ublock.Set("installation_mode", "normal_installed");
-  ublock.Set("update_url", kCobaltUpdateUrl);
+  entry.Set("installation_mode", "normal_installed");
+  entry.Set("update_url", kCobaltUpdateUrl);
+  return entry;
+}
 
+base::Value BuildExtensionSettings() {
   base::Value::Dict settings;
-  settings.Set(kUBlockOriginId, std::move(ublock));
+  settings.Set(kUBlockOriginId, Bundled());
+  settings.Set(kPdfJsId, Bundled());
   return base::Value(std::move(settings));
 }
 
@@ -377,6 +408,12 @@ CobaltBundledExtensionPolicyProvider::CobaltBundledExtensionPolicyProvider() {
   bundle.Get(PolicyNamespace(POLICY_DOMAIN_CHROME, std::string()))
       .Set(key::kExtensionSettings, POLICY_LEVEL_MANDATORY, POLICY_SCOPE_USER,
            POLICY_SOURCE_ENTERPRISE_DEFAULT, BuildExtensionSettings(), nullptr);
+  // pdf.js's own managed setting (its preferences_schema.json): no daily
+  // report of extension and browser version to pdfjs.robwu.nl. Through the
+  // extension policy domain, so the signed extension is not modified.
+  bundle.Get(PolicyNamespace(POLICY_DOMAIN_EXTENSIONS, kPdfJsId))
+      .Set("disableTelemetry", POLICY_LEVEL_MANDATORY, POLICY_SCOPE_USER,
+           POLICY_SOURCE_ENTERPRISE_DEFAULT, base::Value(true), nullptr);
   UpdatePolicy(std::move(bundle));
 }
 
@@ -390,7 +427,7 @@ void CobaltBundledExtensionPolicyProvider::RefreshPolicies(
 }
 
 }  // namespace policy
-""" % {"ublock_id": UBLOCK_ID, "update_url": UPDATE_URL}
+""" % {"ublock_id": UBLOCK_ID, "update_url": UPDATE_URL, "pdfjs_id": PDFJS_ID}
 
 
 # ---------------------------------------------------------------- edits
@@ -613,10 +650,49 @@ def patch_android_assets() -> str:
                 done_marker="bundled_extension_assets")
 
 
+def patch_pdfjs_file_access() -> str:
+    """Grant the bundled pdf.js file access at install: pref and creation flag.
+
+    The pref is what `chrome.extension.isAllowedFileSchemeAccess` and the
+    permission checks read (util::AllowFileAccess). Chromium writes it at
+    install only for unpacked extensions; this adds Cobalt's pdf.js id, still
+    only when no setting exists. The creation flag makes the freshly installed
+    Extension object carry it too, so access works from the first launch
+    rather than from the second (installed_loader rebuilds the flag from the
+    pref on every later start).
+    """
+    reg = SRC / "extensions/browser/extension_registrar.cc"
+    r = edit(reg,
+             """  if (Manifest::ShouldAlwaysAllowFileAccess(extension->location()) &&
+      !extension_prefs_->HasAllowFileAccessSetting(extension->id())) {""",
+             f"""  // Cobalt: its bundled pdf.js (id {PDFJS_ID}) opens local PDFs as file://
+  // URLs, so it is granted file access at install like an unpacked extension.
+  if ((Manifest::ShouldAlwaysAllowFileAccess(extension->location()) ||
+       extension->id() == "{PDFJS_ID}") &&
+      !extension_prefs_->HasAllowFileAccessSetting(extension->id())) {{""",
+             done_marker="its bundled pdf.js")
+    crx = SRC / "chrome/browser/extensions/crx_installer.cc"
+    c = edit(crx,
+             """  if (ExtensionPrefs::Get(profile())->AllowFileAccess(extension()->id()))
+    creation_flags_ |= Extension::ALLOW_FILE_ACCESS;
+""",
+             f"""  if (ExtensionPrefs::Get(profile())->AllowFileAccess(extension()->id()))
+    creation_flags_ |= Extension::ALLOW_FILE_ACCESS;
+  // Cobalt: its bundled pdf.js opens local PDFs; see extension_registrar.cc.
+  if (extension()->id() == "{PDFJS_ID}" &&
+      !ExtensionPrefs::Get(profile())->HasAllowFileAccessSetting(extension()->id())) {{
+    creation_flags_ |= Extension::ALLOW_FILE_ACCESS;
+  }}
+""",
+             done_marker="its bundled pdf.js opens local PDFs")
+    return f"registrar {r}, installer {c}"
+
+
 # ---------------------------------------------------------------- driver
 
 STEPS = [
     ("stage ublock.crx into the tree", stage_crx),
+    ("stage pdfjs.crx into the tree", lambda: stage_crx(PDFJS_CRX, "pdfjs.crx")),
     ("chrome/browser/cobalt/extensions/BUILD.gn",
      lambda: write(ASSET_DIR / "BUILD.gn", ASSET_BUILD_GN)),
     ("chrome/browser/cobalt/bundled_extensions.h",
@@ -635,6 +711,7 @@ STEPS = [
     ("chrome/browser/BUILD.gn (shared sources)", patch_browser_build_gn),
     ("chrome/browser/BUILD.gn (android sources)", patch_browser_build_gn_android),
     ("chrome/android/BUILD.gn (assets)", patch_android_assets),
+    ("pdf.js file access (registrar, installer)", patch_pdfjs_file_access),
 ]
 
 
@@ -657,7 +734,8 @@ def main() -> int:
         print(f"\n{failures} step(s) failed; tree is partially patched",
               file=sys.stderr)
         return 1
-    print(f"\nuBlock Origin {UBLOCK_VERSION} ({UBLOCK_ID}) bundled.")
+    print(f"\nuBlock Origin {UBLOCK_VERSION} ({UBLOCK_ID}) and "
+          f"pdf.js {PDFJS_VERSION} ({PDFJS_ID}) bundled.")
     return 0
 
 
