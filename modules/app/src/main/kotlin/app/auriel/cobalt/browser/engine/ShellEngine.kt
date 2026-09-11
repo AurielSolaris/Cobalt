@@ -37,6 +37,12 @@ interface ShellEngine {
     /** Where the Extensions section goes, or null if this engine has none. */
     val extensionsUrl: String?
 
+    /** What renders pages, with its version, for the About page. */
+    val engineName: String
+
+    /** The engine's own third-party licence page, if it has one. */
+    val creditsUrl: String? get() = null
+
     /**
      * Turns what the user typed into something [EngineSession.loadUrl] takes,
      * or null if it is not an address.
@@ -96,6 +102,7 @@ class DocumentShellEngine : ShellEngine {
     // It keeps nothing in any tab, so an incognito tab is no different.
     override val supportsIncognito = true
     override val extensionsUrl: String? = null
+    override val engineName = "Cobalt document engine (0.1.0)"
 
     @Composable
     override fun Page(session: EngineSession, modifier: Modifier) {

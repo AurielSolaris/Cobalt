@@ -1,8 +1,40 @@
 # 0007 — User-authored themes, edited on the device
 
-**Status:** accepted, deferred
-**Stage:** 7 (browser features) — after the patches land, not before
+**Status:** accepted; colours implemented 2026-09-11, fonts not yet
+**Stage:** 7 (browser features), brought forward with the shell
 **Supersedes:** the default-theme choice in [0002](0002-shell-design.md)
+
+## Implemented (2026-09-11)
+
+What exists, in `modules/app/.../ui/theme/` and `browser/settings/`:
+
+- **Four presets:** **Cobalt** (the default dark theme, and this decision's
+  "Carbon, iced, with a One Dark cast", a modified One Dark that carries the
+  project's name), **One Dark** (Atom's, unchanged, what 0.1.0 shipped),
+  **Solarized Light** and **Solarized Dark**.
+- **A light theme and a dark theme, paired.** The user picks one for each, and
+  the app follows the phone's light/dark setting, or is pinned to either. The
+  defaults are Solarized Light and Cobalt. The maintainer chose pairing over a
+  single theme.
+- **Custom themes are made by entering colour values** in Settings → Theme:
+  a swatch that opens a hue/vividness/brightness picker, and a hex field
+  (`#RGB`, `#RRGGBB` or `rgb(…)`), for each of the eleven tokens below, with a
+  live preview. No CSS is written by hand. Text stays the sharing format only:
+  CSS custom properties (`--bg-primary: #16181C;`), which Share produces and
+  Paste accepts, with missing tokens derived rather than refused.
+- **Contrast warns, never blocks**, with a one-tap Fix that moves the text
+  side of the pair toward white or black, keeping its hue. Every preset
+  passes. Solarized Light's text is base01 darkened 3%, because base01 on
+  base2 is 4.39:1.
+- **Incognito is derived** from the dark theme by a fixed transform (grounds
+  sink toward black, the accent becomes cyan), whatever the user made.
+- Custom themes are stored as files in the app's files directory, in the
+  sharing format, so auto-backup carries them across a reinstall.
+
+**Not yet:** fonts (the Google Fonts picker below), and `accent.gradient`
+beyond its second stop: the angle is not modelled until a surface uses it. The
+theme editor lives in Settings, reached from the toolbar's ⋮ sheet, not the
+"top-right overflow" named below, which no longer exists (0002, amended).
 
 ## Decision
 

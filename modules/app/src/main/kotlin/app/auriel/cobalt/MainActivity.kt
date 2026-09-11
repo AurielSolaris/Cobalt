@@ -25,7 +25,9 @@ import app.auriel.cobalt.browser.CenteredMessage
 import app.auriel.cobalt.browser.Screenshot
 import app.auriel.cobalt.browser.engine.ShellEngine
 import app.auriel.cobalt.browser.engine.ShellEngines
+import app.auriel.cobalt.browser.settings.AboutInfo
 import app.auriel.cobalt.ui.theme.CobaltTheme
+import app.auriel.cobalt.ui.theme.ThemeStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -51,6 +53,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        ThemeStore.init(this)
         pendingUrl = urlFrom(intent)
         shell = ShellEngines.create(this)
         lifecycleScope.launch {
@@ -94,6 +97,9 @@ class MainActivity : ComponentActivity() {
                 onCloseTab = current::onCloseTab,
                 onCloseAllTabs = current::onCloseAllTabs,
                 onSheetOpening = current::captureThumbnail,
+                certificate = { current.session(state.activeTabId).certificate() },
+                about = AboutInfo(engineName = shell.engineName, creditsUrl = shell.creditsUrl),
+                onOpenInNewTab = current::openInNewTab,
             )
         }
     }

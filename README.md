@@ -212,9 +212,16 @@ What works, on device:
 - **Extensions** opens `chrome://extensions`, with uBlock Origin installed and blocking
 - A screenshot of the visible page from the ⋮ sheet, saved to `Pictures/Cobalt`
 - Opening links from other apps
+- The lock icon explains itself: tap it for the connection's state and the
+  site's certificate (issuer, validity, SHA-256)
+- Themes: Cobalt, One Dark, Solarized Light and Solarized Dark, with one theme
+  for day and one for night following the phone. You can make your own on the
+  phone by choosing colours, and share them as text
+  ([decision 0007](docs/decisions/0007-user-themes.md))
+- Settings → About: version, engine, source and licences
 
-Not there yet: downloads, bookmarks, settings and incognito, which have their
-places in the interface and say so. How the shell reaches Chromium, and every
+Not there yet: downloads, bookmarks, search from the address bar, custom
+fonts and incognito. They have their places in the interface and say so. How the shell reaches Chromium, and every
 problem that took, is in [`docs/shell-integration.md`](docs/shell-integration.md).
 
 Without a Chromium build to export from, `./gradlew` builds the same shell on

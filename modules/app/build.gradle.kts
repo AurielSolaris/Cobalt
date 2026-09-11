@@ -122,6 +122,23 @@ android {
         }
     }
 
+    // Release signing, from a keystore named in ~/.gradle/gradle.properties
+    // (cobalt.keystore, cobalt.keystore.password, cobalt.key.alias,
+    // cobalt.key.password) and never from this repository. There is no project
+    // release key yet: whoever holds it controls every future update, so
+    // creating one is the maintainer's decision, not a build script's. Until
+    // it exists a release build is signed with the debug key, which installs
+    // and runs but is not an update path anyone should rely on.
+    val releaseKeystore = (findProperty("cobalt.keystore") as String?)?.let(::file)
+    signingConfigs {
+        if (releaseKeystore != null) create("release") {
+            storeFile = releaseKeystore
+            storePassword = findProperty("cobalt.keystore.password") as String?
+            keyAlias = findProperty("cobalt.key.alias") as String?
+            keyPassword = findProperty("cobalt.key.password") as String?
+        }
+    }
+
     buildTypes {
         debug {
             // The nightly channel installs alongside stable rather than over it,
@@ -134,6 +151,7 @@ android {
         release {
             isMinifyEnabled = false
             resValue("string", "app_name", "Cobalt")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

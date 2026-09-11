@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.chromium.base.version_info.VersionConstants
 
 /**
  * Chromium as the shell's engine. Found by name from `ShellEngines.create`.
@@ -36,6 +37,10 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
     // Needs an off-the-record Profile; see ChromiumEngine.createSession.
     override val supportsIncognito = false
     override val extensionsUrl = "chrome://extensions"
+    override val engineName = "Chromium ${VersionConstants.PRODUCT_VERSION}"
+
+    /** Chromium's own page listing every third-party licence it ships. */
+    override val creditsUrl = "chrome://credits"
 
     init {
         ChromiumStartup.start(activity)

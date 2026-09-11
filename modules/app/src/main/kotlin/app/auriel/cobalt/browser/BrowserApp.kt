@@ -27,6 +27,9 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.auriel.cobalt.browser.engine.CertificateSummary
+import app.auriel.cobalt.browser.settings.AboutInfo
+import app.auriel.cobalt.browser.settings.SettingsScreen
 import app.auriel.cobalt.ui.theme.CobaltTheme
 
 /** Which sheet is up, if any. Interface state, so it lives here and not in the controller. */
@@ -63,6 +66,9 @@ fun BrowserApp(
     onCloseTab: (Long) -> Unit,
     onCloseAllTabs: (Boolean) -> Unit,
     onSheetOpening: () -> Unit,
+    certificate: () -> CertificateSummary?,
+    about: AboutInfo,
+    onOpenInNewTab: (String) -> Unit,
 ) {
     val tab = state.activeTab
     var sheet by remember { mutableStateOf<Sheet?>(null) }
@@ -89,7 +95,14 @@ fun BrowserApp(
                     page(Modifier.fillMaxSize())
 
                     when {
-                        state.section != Section.Home -> Covering { SectionScreen(state.section) }
+                        state.section != Section.Home -> Covering {
+                            SectionScreen(
+                                section = state.section,
+                                about = about,
+                                onClose = { onSectionSelected(Section.Home) },
+                                onOpen = onOpenInNewTab,
+                            )
+                        }
 
                         tab.invalidAddress != null -> Covering {
                             CenteredMessage(
@@ -115,8 +128,11 @@ fun BrowserApp(
 
                 AddressBar(
                     text = tab.addressText,
+                    pageUrl = tab.page.url,
                     isLoading = tab.isLoading,
                     incognito = tab.incognito,
+                    security = tab.page.security,
+                    certificate = certificate,
                     tabCount = state.tabs.size,
                     tabsOpen = sheet == Sheet.Tabs,
                     onTextChanged = onAddressChanged,
@@ -193,8 +209,10 @@ private fun Covering(content: @Composable () -> Unit) {
 
 /** The places that are not pages yet. Back, or any tab, returns to the page. */
 @Composable
-private fun SectionScreen(section: Section) {
+private fun SectionScreen(section: Section, about: AboutInfo, onClose: () -> Unit, onOpen: (String) -> Unit) {
     when (section) {
+        Section.Settings -> SettingsScreen(about = about, onClose = onClose, onOpen = onOpen)
+
         Section.Home, Section.Tabs -> Unit
 
         // Reached only on the document engine: with Chromium, Extensions opens
@@ -214,11 +232,6 @@ private fun SectionScreen(section: Section) {
         Section.Downloads -> ComingLater(
             title = "Downloads",
             detail = "Downloads are the next part of the shell to be built.",
-        )
-
-        Section.Settings -> ComingLater(
-            title = "Settings",
-            detail = "Settings are the next part of the shell to be built.",
         )
     }
 }

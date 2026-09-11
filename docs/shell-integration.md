@@ -436,10 +436,30 @@ showed Android's stock icon on a white window. Both are fixed, and the launch
 window now uses the shell's own background, so start-up does not flash a
 different colour.
 
-### Found, not yet fixed
+### Since then
 
-- `chrome://extensions` renders at desktop width (`IS_DESKTOP_ANDROID`), so it
-  is legible only zoomed. The extension surfaces are step 7 anyway.
+**Chromium's own pages get a phone viewport.** `chrome://extensions` and the
+other WebUI pages declare none, so Blink laid them out 980 px wide and scaled
+them down until they were illegible. `content/WebUiMobile.kt` adds
+`width=device-width, initial-scale=1` as soon as the document exists. It uses
+`evaluateJavaScript`, which Chromium refuses for anything that is not WebUI, so
+it cannot reach a website. Fixed-width parts (a 400 px extension card) still
+scroll sideways; restyling them from outside meant reaching into shadow roots,
+and was dropped as not worth it for nightly.
+
+**The lock is Chromium's verdict, and it explains itself.** The address bar
+used to guess security from `https://`. It now shows
+`SecurityStateModel.getSecurityLevelForWebContents`, which knows about
+certificate errors, mixed content and flagged sites. Tapping it opens a popup
+that says what the state means and, for a secure page, shows the certificate
+(`CertificateChainHelper.getCertificateChain`, decoded with
+`java.security`): issued to, issued by, validity, chain length and SHA-256.
+
+**Settings exist:** Theme ([0007](decisions/0007-user-themes.md)) and About,
+which shows the build, the engine version (`VersionConstants`) and links to the
+source and to `chrome://credits`.
+
+### Found, not yet fixed
 - Typing words that are not an address shows "not a web address". Search needs
   a default engine, and choosing one is a product decision, not a shell detail.
 - Incognito is visible but disabled until step 8.

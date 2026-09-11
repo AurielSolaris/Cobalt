@@ -132,6 +132,9 @@ class DocumentSession(
             canGoBack = index > 0,
             canGoForward = index < history.size - 1,
             error = null,
+            // OkHttp refuses a certificate it cannot validate, so an https
+            // page that loads at all was delivered securely.
+            security = if (url.isSecure) Security.Secure else Security.NotSecure,
         )
         inFlight = scope.launch {
             when (val result = loader.load(url)) {

@@ -1,14 +1,17 @@
 # Building Cobalt
 
-## Current milestone (0.1.0)
+## The shell app (Gradle)
 
-0.1.0 builds with Gradle alone. The Chromium toolchain is not needed until Stage 3.
+The shell builds with Gradle alone. Without a Chromium export it runs on the
+0.1.0 document engine; with one (`tools/build/export-aar.sh`, which puts the
+AAR in `modules/app/libs/`) it runs on Chromium. Both configurations must
+build and pass their unit tests.
 
 ### Requirements
 
-- JDK 17
-- Android SDK, `compileSdk 35`, `minSdk 24`
-- A device or emulator running Android 7.0 (API 24) or later
+- JDK 17 or later
+- Android SDK, `compileSdk 36`, `minSdk 29` (Chromium's floor)
+- A device running Android 10 (API 29) or later, arm64 for the Chromium build
 
 ### Setup
 
@@ -27,7 +30,33 @@ On Windows, use forward slashes: `sdk.dir=C:/Users/you/AppData/Local/Android/Sdk
 ./gradlew :modules:app:installDebug      # build and install on a connected device
 ./gradlew check                          # unit tests across all modules
 ./gradlew :modules:core:allTests         # one module's tests
+./gradlew :modules:app:assembleRelease   # release APK, "Cobalt", app.auriel.cobalt
 ```
+
+The debug build is **Cobalt Nightly** (`app.auriel.cobalt.nightly`) and
+installs beside a release build, not over it.
+
+### Release signing
+
+There is no project release key yet. Whoever holds it controls every future
+update, so creating one is the maintainer's decision. Until then
+`assembleRelease` signs with the Android debug key: it installs and runs, but
+it is not an update path to rely on.
+
+To sign with a real key, name it in `~/.gradle/gradle.properties`, never in
+this repository:
+
+```properties
+cobalt.keystore=/path/to/cobalt-release.jks
+cobalt.keystore.password=…
+cobalt.key.alias=cobalt
+cobalt.key.password=…
+```
+
+With the Chromium AAR the release APK is about 410 MB. `libchrome.so` is
+stored uncompressed so it can be loaded in place, and R8 is not enabled yet
+(an unshrunk Chromium AAR is 22,000 classes; the keep rules are their own
+piece of work).
 
 The Kotlin Multiplatform modules (`core`, `engine`) declare `linuxX64` and `mingwX64`
 targets alongside Android. Those exist to keep the shared code free of accidental JVM

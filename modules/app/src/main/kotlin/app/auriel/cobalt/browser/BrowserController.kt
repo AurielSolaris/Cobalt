@@ -182,6 +182,13 @@ class BrowserController(
         section.value = Section.Home
     }
 
+    /** Opens [url] beside the current tab, for links from the browser's own screens. */
+    fun openInNewTab(url: String) {
+        val normalized = shell.normalize(url) ?: return
+        tabs.newTab(url = normalized)
+        section.value = Section.Home
+    }
+
     fun onTabSelected(id: Long) {
         tabs.select(id)
         section.value = Section.Home

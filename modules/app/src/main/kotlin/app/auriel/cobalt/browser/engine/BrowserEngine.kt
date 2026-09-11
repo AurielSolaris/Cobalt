@@ -97,6 +97,12 @@ interface EngineSession {
     fun goForward(): Boolean
 
     /**
+     * The certificate the page was served with, for the security popup; null
+     * when there is none (http, internal pages) or the engine cannot say.
+     */
+    fun certificate(): CertificateSummary? = null
+
+    /**
      * Releases this session.
      *
      * After this the session is dead and must not be used. Closing a tab in the
@@ -129,9 +135,44 @@ data class SessionState(
      * has to be redrawn; delivering it as a one-shot callback loses it.
      */
     val error: SessionError? = null,
+    /** How the page was delivered, as the engine judges it. */
+    val security: Security = Security.None,
 ) {
     val isLoading: Boolean get() = progress < 1f
 }
+
+/**
+ * The address bar's security state.
+ *
+ * The engine's verdict, not a guess from the URL: `https://` with a bad
+ * certificate or mixed content is not [Secure], and only the engine knows.
+ */
+enum class Security {
+    /** Nothing loaded yet. */
+    None,
+    /** The browser's own page (`chrome://`), never sent over a network. */
+    Internal,
+    /** Valid certificate, nothing insecure on the page. */
+    Secure,
+    /** Plain http, or https with insecure content mixed in. */
+    NotSecure,
+    /** A certificate error or a page flagged as harmful. */
+    Dangerous,
+}
+
+/** The parts of a certificate a person can check, already decoded. */
+data class CertificateSummary(
+    /** Who it was issued to: the subject's common name, or organisation. */
+    val issuedTo: String,
+    /** Who issued it. */
+    val issuedBy: String,
+    val validFrom: java.util.Date,
+    val validUntil: java.util.Date,
+    /** SHA-256 of the leaf certificate, colon-separated hex. */
+    val sha256: String,
+    /** Certificates in the chain, leaf included. */
+    val chainLength: Int,
+)
 
 /**
  * Why a navigation failed, in terms the interface can act on.

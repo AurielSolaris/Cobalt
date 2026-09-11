@@ -10,6 +10,15 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import app.auriel.cobalt.browser.engine.BrowserEngine
+import app.auriel.cobalt.browser.engine.CertificateSummary
+import app.auriel.cobalt.browser.engine.Security
+import java.io.ByteArrayInputStream
+import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import org.chromium.components.page_info.CertificateChainHelper
+import org.chromium.components.security_state.ConnectionSecurityLevel
+import org.chromium.components.security_state.SecurityStateModel
 import app.auriel.cobalt.browser.engine.EngineSession
 import app.auriel.cobalt.browser.engine.SessionError
 import app.auriel.cobalt.browser.engine.SessionState
@@ -186,6 +195,9 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
     }
 }
 
+/** One `TYPE=value` of an RFC 2253 distinguished name. */
+private val RDN = Regex("""(?:^|,)\s*([A-Za-z]+)=((?:\\.|[^,])*)""")
+
 /** One tab: a `WebContents`, its input view, and the state the shell draws. */
 private class ChromiumSession(
     private val webContents: WebContents,
@@ -215,7 +227,21 @@ private class ChromiumSession(
      */
     private val observer = object : WebContentsObserver(webContents) {
         override fun loadProgressChanged(progress: Float) = publish(progress)
+
+        /**
+         * Gives Chromium's own desktop pages a phone viewport; see
+         * [WEBUI_MOBILE_SCRIPT].
+         *
+         * In the shell rather than a Chromium patch because it is shell
+         * behaviour and needs no rebuild of Chromium. It runs as soon as the
+         * document element exists, before first paint.
+         */
+        override fun primaryMainDocumentElementAvailable() {
+            if (webContents.visibleUrl?.scheme != "chrome") return
+            webContents.evaluateJavaScript(WEBUI_MOBILE_SCRIPT, null)
+        }
         override fun titleWasSet(title: String?) = publish()
+        override fun didChangeVisibleSecurityState() = publish()
         override fun didFirstVisuallyNonEmptyPaint() = publish()
 
         override fun didStartNavigationInPrimaryMainFrame(
@@ -303,7 +329,49 @@ private class ChromiumSession(
             canGoBack = controller?.canGoBack() ?: false,
             canGoForward = controller?.canGoForward() ?: false,
             error = error,
+            security = security(),
         )
+    }
+
+    private fun security(): Security {
+        val url = webContents.visibleUrl ?: return Security.None
+        if (url.isEmpty) return Security.None
+        if (url.scheme == "chrome" || url.scheme == "about") return Security.Internal
+        return when (SecurityStateModel.getSecurityLevelForWebContents(webContents)) {
+            ConnectionSecurityLevel.SECURE -> Security.Secure
+            ConnectionSecurityLevel.DANGEROUS -> Security.Dangerous
+            // WARNING is Chromium's "not secure" for http and mixed content,
+            // and NONE with an http URL means the same thing to a person.
+            else -> Security.NotSecure
+        }
+    }
+
+    override fun certificate(): CertificateSummary? {
+        val chain = CertificateChainHelper.getCertificateChain(webContents) ?: return null
+        val leafDer = chain.firstOrNull() ?: return null
+        val leaf = CertificateFactory.getInstance("X.509")
+            .generateCertificate(ByteArrayInputStream(leafDer)) as X509Certificate
+        return CertificateSummary(
+            issuedTo = nameOf(leaf.subjectX500Principal.name),
+            issuedBy = nameOf(leaf.issuerX500Principal.name),
+            validFrom = leaf.notBefore,
+            validUntil = leaf.notAfter,
+            sha256 = MessageDigest.getInstance("SHA-256").digest(leafDer)
+                .joinToString(":") { "%02X".format(it) },
+            chainLength = chain.size,
+        )
+    }
+
+    /**
+     * The common name from an RFC 2253 name (`CN=example.org,O=Example,C=US`),
+     * else the organisation, else all of it. By hand because `javax.naming`
+     * is not on Android; escaped commas (`\,`) are honoured.
+     */
+    private fun nameOf(x500: String): String {
+        val parts = RDN.findAll(x500).associate {
+            it.groupValues[1].uppercase() to it.groupValues[2].replace("\\", "")
+        }
+        return parts["CN"] ?: parts["O"] ?: x500
     }
 
     override fun loadUrl(url: String) {
