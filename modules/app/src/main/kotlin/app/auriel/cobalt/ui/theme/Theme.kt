@@ -1,6 +1,10 @@
 package app.auriel.cobalt.ui.theme
 
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +39,23 @@ fun CobaltTheme(
     val systemDark = isSystemInDarkTheme()
     val chosen = palette ?: if (incognito) settings.dark.incognito() else settings.active(systemDark)
     val colors = remember(chosen) { chosen.toColorScheme() }
+
+    // The status and navigation bar icons are the window's, not Compose's, so
+    // they follow the theme only if told. Without this, a light theme gets the
+    // XML theme's white icons on a cream ground. Only the app-wide theme sets
+    // them: a preview (`palette`) must not recolour the real status bar.
+    if (palette == null) {
+        val view = LocalView.current
+        if (!view.isInEditMode) {
+            SideEffect {
+                val window = (view.context as? Activity)?.window ?: return@SideEffect
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !chosen.isDark
+                    isAppearanceLightNavigationBars = !chosen.isDark
+                }
+            }
+        }
+    }
 
     MaterialTheme(
         colorScheme = colors,

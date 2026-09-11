@@ -196,7 +196,24 @@ experiment stays possible, and for no other reason.
     <td align="center">Tabs</td>
     <td align="center">Extensions</td>
   </tr>
+  <tr>
+    <td><img src="docs/images/shell/security.png" width="160" alt="The lock's popup: connection secure, and the site's certificate"></td>
+    <td><img src="docs/images/shell/solarized-light.png" width="160" alt="The same page under the Solarized Light theme"></td>
+    <td><img src="docs/images/shell/themes.png" width="160" alt="Theme settings: a light theme and a dark theme, following the phone"></td>
+    <td><img src="docs/images/shell/theme-editor.png" width="160" alt="The theme editor: a live preview and a colour for each token"></td>
+    <td><img src="docs/images/shell/about.png" width="160" alt="About: version, engine, licence and links"></td>
+  </tr>
+  <tr>
+    <td align="center">The lock</td>
+    <td align="center">Solarized Light</td>
+    <td align="center">Themes</td>
+    <td align="center">Theme editor</td>
+    <td align="center">About</td>
+  </tr>
 </table>
+
+Shown in Cobalt, the default dark theme, except where marked. Screenshots are
+from the nightly build on a Galaxy M31.
 
 Kotlin and Compose, running Chromium underneath: Blink renders every page
 shown here. Everything sits at the bottom of the screen, where a thumb already

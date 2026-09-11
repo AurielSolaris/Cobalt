@@ -459,7 +459,25 @@ that says what the state means and, for a secure page, shows the certificate
 which shows the build, the engine version (`VersionConstants`) and links to the
 source and to `chrome://credits`.
 
+<p>
+  <img src="images/shell/security.png" width="180" alt="The lock's popup with the certificate">
+  <img src="images/shell/themes.png" width="180" alt="Theme settings">
+  <img src="images/shell/about.png" width="180" alt="About">
+</p>
+
+**The status bar follows the theme.** Its icons belong to the window, not to
+Compose, so under Solarized Light they stayed white on cream until
+`CobaltTheme` set them from the palette. Only the app-wide theme does this: the
+editor's preview must not recolour the real status bar.
+
 ### Found, not yet fixed
+
+- **`chrome://credits` is Chromium's placeholder**: "This is sample credits
+  page. To get correct credits page, set `generate_about_credits=true` in
+  args.gn". This build carries no third-party licence text, and About links to
+  it. That is a distribution blocker, not a cosmetic one: Chromium's
+  components' licences require the attributions to ship. The fix is the
+  `args.gn` flag and a Chromium rebuild.
 - Typing words that are not an address shows "not a web address". Search needs
   a default engine, and choosing one is a product decision, not a shell detail.
 - Incognito is visible but disabled until step 8.
