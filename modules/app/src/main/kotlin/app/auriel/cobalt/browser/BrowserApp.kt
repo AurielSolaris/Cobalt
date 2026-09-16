@@ -125,50 +125,57 @@ fun BrowserApp(
                     }
                 }
 
-                val notice = state.downloadNotice
-                if (notice != null && state.section != Section.Downloads) {
-                    DownloadNotice(
-                        entry = notice,
-                        onView = { onSectionSelected(Section.Downloads) },
-                        onOpen = { downloadActions.onOpen(notice.id) },
-                        onDismiss = onDismissDownloadNotice,
+                // The toolbar belongs to the page. A section -- Settings,
+                // Downloads, Bookmarks, History -- is a place of its own, with
+                // its own back arrow, and none of address, tab count or ⋮ acts
+                // on what is on screen there. So the whole strip goes away
+                // while a section is open, and the section gets the height.
+                if (state.section == Section.Home) {
+                    val notice = state.downloadNotice
+                    if (notice != null) {
+                        DownloadNotice(
+                            entry = notice,
+                            onView = { onSectionSelected(Section.Downloads) },
+                            onOpen = { downloadActions.onOpen(notice.id) },
+                            onDismiss = onDismissDownloadNotice,
+                        )
+                    }
+
+                    if (tab.isLoading) {
+                        LinearProgressIndicator(
+                            progress = { tab.page.progress },
+                            modifier = Modifier.fillMaxWidth().height(2.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                    } else {
+                        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+
+                    AddressBar(
+                        text = tab.addressText,
+                        pageUrl = tab.page.url,
+                        isLoading = tab.isLoading,
+                        incognito = tab.incognito,
+                        security = tab.page.security,
+                        certificate = certificate,
+                        onClearSiteData = onClearSiteData,
+                        tabCount = state.tabs.size,
+                        tabsOpen = sheet == Sheet.Tabs,
+                        onTextChanged = onAddressChanged,
+                        onGo = onGo,
+                        onReload = onReload,
+                        onStop = onStop,
+                        onTabs = {
+                            onSheetOpening()
+                            sheet = Sheet.Tabs
+                        },
+                        onMenu = {
+                            onSheetOpening()
+                            sheet = Sheet.Menu
+                        },
                     )
                 }
-
-                if (tab.isLoading && state.section == Section.Home) {
-                    LinearProgressIndicator(
-                        progress = { tab.page.progress },
-                        modifier = Modifier.fillMaxWidth().height(2.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    )
-                } else {
-                    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                }
-
-                AddressBar(
-                    text = tab.addressText,
-                    pageUrl = tab.page.url,
-                    isLoading = tab.isLoading,
-                    incognito = tab.incognito,
-                    security = tab.page.security,
-                    certificate = certificate,
-                    onClearSiteData = onClearSiteData,
-                    tabCount = state.tabs.size,
-                    tabsOpen = sheet == Sheet.Tabs,
-                    onTextChanged = onAddressChanged,
-                    onGo = onGo,
-                    onReload = onReload,
-                    onStop = onStop,
-                    onTabs = {
-                        onSheetOpening()
-                        sheet = Sheet.Tabs
-                    },
-                    onMenu = {
-                        onSheetOpening()
-                        sheet = Sheet.Menu
-                    },
-                )
             }
 
             when (sheet) {
@@ -245,9 +252,9 @@ private fun SectionScreen(
 ) {
     when (state.section) {
         Section.Settings -> SettingsScreen(about = about, onClose = onClose, onOpen = onOpen)
-        Section.Downloads -> DownloadsScreen(state.downloads, downloadActions)
-        Section.Bookmarks -> BookmarksScreen(state.bookmarks, bookmarkActions)
-        Section.History -> HistoryScreen(state.history, historyActions)
+        Section.Downloads -> DownloadsScreen(state.downloads, downloadActions, onClose)
+        Section.Bookmarks -> BookmarksScreen(state.bookmarks, bookmarkActions, onClose)
+        Section.History -> HistoryScreen(state.history, historyActions, onClose)
 
         Section.Home, Section.Tabs -> Unit
 

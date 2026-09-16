@@ -240,7 +240,9 @@ Kotlin and Compose, running Chromium underneath: Blink renders every page
 shown here. Everything sits at the bottom of the screen, where a thumb already
 is. There is one toolbar with the address, the tab count and ⋮, and nothing
 drawn above or floating over the page. The tab switcher and the options menu are
-sheets that rise from that toolbar and go away when you're done
+sheets that rise from that toolbar and go away when you're done. The toolbar
+belongs to the page: open Settings, Downloads, Bookmarks or History and it goes
+away too, each of those carrying its own back arrow
 ([decision 0002](docs/decisions/0002-shell-design.md)).
 
 What works, on device:

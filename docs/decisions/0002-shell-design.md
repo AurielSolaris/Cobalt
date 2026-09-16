@@ -57,6 +57,13 @@ settings). Nothing is drawn above the page and nothing floats over it. The
 reasons are less on screen competing with the page, and every control within a
 thumb's reach. While the keyboard is up, the toolbar rides above it.
 
+**The toolbar belongs to the page, not to the app** *(amended 2026-09-16)*.
+Settings, Downloads, Bookmarks and History are places of their own, and none of
+the address, the tab count or ⋮ acts on what is on screen in one. So the whole
+row goes away while a section is open and the section gets that height; each
+carries a back arrow in its header, where Settings already kept one. System
+Back already left a section, so this only makes the way out visible.
+
 A floating action button was considered for home, tabs and reload, and
 rejected. It covers whatever part of the page is under it (consent banners and
 sites' own bottom navigation, in practice), and it would make the tab switcher,

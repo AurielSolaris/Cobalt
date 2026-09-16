@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -78,14 +79,19 @@ class DownloadActions(
  * never suggest the file survives.
  */
 @Composable
-fun DownloadsScreen(downloads: List<DownloadEntry>?, actions: DownloadActions) {
+fun DownloadsScreen(downloads: List<DownloadEntry>?, actions: DownloadActions, onClose: () -> Unit) {
     val colors = MaterialTheme.colorScheme
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The browser's toolbar is not drawn over a section, so the way
+            // back is here, where Settings keeps it too.
+            IconButton(onClick = onClose) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.onSurfaceVariant)
+            }
             Text("Downloads", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
             Spacer(Modifier.width(10.dp))
             if (downloads != null) {

@@ -401,7 +401,7 @@ pieces:
 |---|---|
 | `browser/engine/ShellEngine.kt` | The Activity-level half of the seam: start-up status, the page surface, capabilities (incognito, extensions URL), page capture. `ShellEngines.create` finds `ChromiumShellEngine` by name and falls back to the document engine, because `content/` is not compiled without the AAR. |
 | `browser/BrowserController.kt` | Replaces `BrowserViewModel`. Drives the screens from `TabModel`; owned by the Activity, because every session is bound to its window. |
-| `browser/BrowserApp.kt` | The page, then one toolbar. The page surface is composed **once**; home and placeholder sections are drawn over it, never instead of it. |
+| `browser/BrowserApp.kt` | The page, then one toolbar — drawn only while a page is what you are looking at, so a section (Settings, Downloads, Bookmarks, History) gets the full height and its own back arrow. The page surface is composed **once**; home and the sections are drawn over it, never instead of it. |
 | `browser/BrowserSheets.kt` | The options sheet and the tab switcher. |
 
 Verified on device (SM-M315F): typing an address, links, system Back, Forward

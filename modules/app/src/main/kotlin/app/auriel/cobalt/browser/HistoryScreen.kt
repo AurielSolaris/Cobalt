@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
@@ -74,7 +75,7 @@ class HistoryActions(
  * went there, and nothing else. Clearing all of it is red and asks first.
  */
 @Composable
-fun HistoryScreen(history: HistoryPage?, actions: HistoryActions) {
+fun HistoryScreen(history: HistoryPage?, actions: HistoryActions, onClose: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     var confirmClear by remember { mutableStateOf(false) }
 
@@ -96,9 +97,14 @@ fun HistoryScreen(history: HistoryPage?, actions: HistoryActions) {
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 2.dp),
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The browser's toolbar is not drawn over a section, so the way
+            // back is here, where Settings keeps it too.
+            IconButton(onClick = onClose) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.onSurfaceVariant)
+            }
             Text("History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
             Spacer(Modifier.weight(1f))
             if (!history?.items.isNullOrEmpty()) {
