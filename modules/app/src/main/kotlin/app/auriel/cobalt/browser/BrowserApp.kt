@@ -72,6 +72,7 @@ fun BrowserApp(
     downloadActions: DownloadActions,
     onDismissDownloadNotice: () -> Unit,
     bookmarkActions: BookmarkActions,
+    historyActions: HistoryActions,
     onToggleBookmark: () -> Unit,
     onClearSiteData: (onDone: () -> Unit) -> Boolean,
     onShare: () -> Unit,
@@ -109,6 +110,7 @@ fun BrowserApp(
                                 onOpen = onOpenInNewTab,
                                 downloadActions = downloadActions,
                                 bookmarkActions = bookmarkActions,
+                                historyActions = historyActions,
                             )
                         }
 
@@ -185,6 +187,7 @@ fun BrowserApp(
                         onExtensions = { onSectionSelected(Section.Extensions) },
                         onDownloads = { onSectionSelected(Section.Downloads) },
                         onBookmarks = { onSectionSelected(Section.Bookmarks) },
+                        onHistory = { onSectionSelected(Section.History) },
                         onSettings = { onSectionSelected(Section.Settings) },
                     ),
                     onDismiss = { sheet = null },
@@ -238,11 +241,13 @@ private fun SectionScreen(
     onOpen: (String) -> Unit,
     downloadActions: DownloadActions,
     bookmarkActions: BookmarkActions,
+    historyActions: HistoryActions,
 ) {
     when (state.section) {
         Section.Settings -> SettingsScreen(about = about, onClose = onClose, onOpen = onOpen)
         Section.Downloads -> DownloadsScreen(state.downloads, downloadActions)
         Section.Bookmarks -> BookmarksScreen(state.bookmarks, bookmarkActions)
+        Section.History -> HistoryScreen(state.history, historyActions)
 
         Section.Home, Section.Tabs -> Unit
 

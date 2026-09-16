@@ -4,7 +4,12 @@ plugins {
     alias(libs.plugins.kotlinCompose)
 }
 
-val chromiumAar = file("libs/cobalt-content.aar")
+// -Pcobalt.noGms builds against the AAR with Google Play Services removed
+// (tools/build/strip-gms-aar.py), to find out what Cobalt actually uses; see
+// docs/gms-removal.md.
+val chromiumAar = file(
+    if (hasProperty("cobalt.noGms")) "libs/cobalt-content-nogms.aar" else "libs/cobalt-content.aar"
+)
 val hasChromium = chromiumAar.exists()
 
 android {
@@ -23,8 +28,8 @@ android {
         // org.chromium.build.BuildConfig.MIN_SDK_VERSION must match this.
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.4.2"
+        versionCode = 7
+        versionName = "0.4.3"
 
         // Which Application class the manifest names.
         //
@@ -221,7 +226,18 @@ dependencies {
         // So the app's androidx.core is forced up to meet it. This is the skew
         // predicted when androidx was excluded from the AAR, arriving exactly
         // where it was predicted to: at runtime.
-        implementation("androidx.core:core:1.16.0")
+        //
+        // 1.16.0 met it only partly. Chromium's accessibility code also calls
+        // 1.17 API, so the first accessibility service to read a page
+        // (TalkBack, or `uiautomator dump`) crashed the browser:
+        //
+        //   NoSuchMethodError: No virtual method setExpandedState(I)V in class
+        //   Landroidx/core/view/accessibility/AccessibilityNodeInfoCompat;
+        //     at AccessibilityNodeInfoBuilder.setAccessibilityNodeInfoBaseAttributes
+        //
+        // Found in 0.4.3. 1.17.0 is the release of the snapshot Chromium was
+        // built against, and it needs AGP 8.9.1 (gradle/libs.versions.toml).
+        implementation("androidx.core:core:1.17.0")
 
         // AppCompat, for the same reason and found the same way.
         //

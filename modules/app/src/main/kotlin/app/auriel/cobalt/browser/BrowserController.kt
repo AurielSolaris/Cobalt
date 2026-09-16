@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import app.auriel.cobalt.browser.engine.SessionState
 import app.auriel.cobalt.browser.engine.ShellEngine
 import app.auriel.cobalt.browser.engine.BookmarkEntry
+import app.auriel.cobalt.browser.engine.HistoryPage
 import app.auriel.cobalt.browser.tabs.SavedTabs
 import app.auriel.cobalt.browser.tabs.TabModel
 import app.auriel.cobalt.browser.tabs.TabStore
@@ -82,6 +83,7 @@ enum class Section {
     Tabs,
     Downloads,
     Bookmarks,
+    History,
     Settings,
 }
 
@@ -96,6 +98,8 @@ data class BrowserState(
     val downloadNotice: DownloadEntry? = null,
     /** Null when the engine has no bookmark store (the document engine). */
     val bookmarks: List<BookmarkEntry>? = null,
+    /** Null when the engine keeps no history (the document engine). */
+    val history: HistoryPage? = null,
 ) {
     /** Whether the page in the active tab is bookmarked. */
     val activeBookmarked: Boolean
@@ -151,8 +155,12 @@ class BrowserController(
     private val bookmarks: StateFlow<List<BookmarkEntry>> =
         bookmarksSource?.items ?: MutableStateFlow(emptyList())
 
+    private val historySource = shell.history
+    private val history: StateFlow<HistoryPage> =
+        historySource?.page ?: MutableStateFlow(HistoryPage())
+
     val state: StateFlow<BrowserState> =
-        combine(listOf(pages, section, edits, invalid, thumbnails, downloads, notice, bookmarks)) { snapshot() }
+        combine(listOf(pages, section, edits, invalid, thumbnails, downloads, notice, bookmarks, history)) { snapshot() }
             .stateIn(scope, SharingStarted.Eagerly, snapshot())
 
     private var saving: Job? = null
@@ -162,8 +170,8 @@ class BrowserController(
         keepTabsOnDisk()
         // A page asking for a new tab gets one in Cobalt's own model, beside
         // the tab that asked.
-        shell.engine.setNewTabHandler { url ->
-            tabs.newTab(url = url)
+        shell.engine.setNewTabHandler { url, incognito ->
+            tabs.newTab(incognito = incognito, url = url)
             section.value = Section.Home
         }
     }
@@ -263,8 +271,21 @@ class BrowserController(
             downloads = if (downloadsSource == null) null else downloads.value,
             downloadNotice = notice.value,
             bookmarks = if (bookmarksSource == null) null else bookmarks.value,
+            history = if (historySource == null) null else history.value,
         )
     }
+
+    // --- History ------------------------------------------------------------
+
+    /**
+     * A search has started: load the whole history, which the screen then
+     * matches itself (fuzzy or regular expression; see FuzzyMatch). The
+     * engine's own search only matches word prefixes.
+     */
+    fun onSearchHistory(@Suppress("UNUSED_PARAMETER") text: String) = historySource?.loadAll()
+    fun onLoadMoreHistory() = historySource?.loadMore()
+    fun onRemoveHistory(id: String) = historySource?.remove(id)
+    fun onClearHistory(onDone: () -> Unit) = historySource?.clearAll(onDone)
 
     // --- Bookmarks ----------------------------------------------------------
 
@@ -320,6 +341,9 @@ class BrowserController(
             section.value = Section.Home
             return
         }
+        // Read fresh each time the page opens: history changes with every page
+        // visited, and a list from the last visit would be missing them.
+        if (target == Section.History) historySource?.query("")
         section.value = target
     }
 

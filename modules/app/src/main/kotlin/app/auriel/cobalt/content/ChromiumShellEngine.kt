@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
 import app.auriel.cobalt.browser.engine.BookmarksSource
+import app.auriel.cobalt.browser.engine.HistorySource
 import app.auriel.cobalt.browser.engine.BrowserEngine
 import app.auriel.cobalt.browser.engine.DownloadsSource
 import app.auriel.cobalt.core.net.UserAgent
@@ -41,14 +42,17 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
     private var chromiumBookmarks: ChromiumBookmarks? = null
     override val bookmarks: BookmarksSource? get() = chromiumBookmarks
 
+    private var chromiumHistory: ChromiumHistory? = null
+    override val history: HistorySource? get() = chromiumHistory
+
     /** pdf.js is bundled (tools/patches/cobalt-bundle-ublock.py). */
     override val opensPdfs: Boolean get() = true
 
     override val engine: BrowserEngine
         get() = checkNotNull(chromium) { "the browser process is not running yet" }
 
-    // Needs an off-the-record Profile; see ChromiumEngine.createSession.
-    override val supportsIncognito = false
+    // Chromium's primary off-the-record Profile; see ChromiumEngine.createSession.
+    override val supportsIncognito = true
     override val extensionsUrl = "chrome://extensions"
     override val engineName = "Chromium ${VersionConstants.PRODUCT_VERSION}"
 
@@ -64,6 +68,7 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
                         chromium = ChromiumEngine(activity)
                         chromiumDownloads = ChromiumDownloads(activity.applicationContext)
                         chromiumBookmarks = ChromiumBookmarks()
+                        chromiumHistory = ChromiumHistory()
                         // The shell's own requests send exactly what Chromium
                         // sends; see UserAgent.
                         UserAgent.syncFrom(ContentUtils.getBrowserUserAgent())
@@ -107,6 +112,8 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
         chromiumDownloads = null
         chromiumBookmarks?.destroy()
         chromiumBookmarks = null
+        chromiumHistory?.destroy()
+        chromiumHistory = null
         chromium?.shutdown()
         chromium = null
     }

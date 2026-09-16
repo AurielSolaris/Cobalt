@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Settings
@@ -59,6 +60,7 @@ class MenuActions(
     val onExtensions: () -> Unit,
     val onDownloads: () -> Unit,
     val onBookmarks: () -> Unit,
+    val onHistory: () -> Unit,
     val onSettings: () -> Unit,
 )
 
@@ -145,6 +147,7 @@ fun MenuSheet(actions: MenuActions, onDismiss: () -> Unit) {
             Entry("Extensions", Icons.Outlined.Extension, run(actions.onExtensions))
             Entry("Downloads", Icons.Outlined.Download, run(actions.onDownloads))
             Entry("Bookmarks", Icons.Outlined.BookmarkBorder, run(actions.onBookmarks))
+            Entry("History", Icons.Outlined.History, run(actions.onHistory))
             Entry("Settings", Icons.Outlined.Settings, run(actions.onSettings))
         }
     }

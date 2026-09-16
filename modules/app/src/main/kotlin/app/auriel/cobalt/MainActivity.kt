@@ -4,6 +4,7 @@ import android.content.Intent
 import app.auriel.cobalt.browser.LocalPdf
 import android.net.Uri
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -23,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import app.auriel.cobalt.browser.BookmarkActions
 import app.auriel.cobalt.browser.BrowserApp
+import app.auriel.cobalt.browser.HistoryActions
 import app.auriel.cobalt.browser.BrowserController
 import app.auriel.cobalt.browser.CenteredMessage
 import app.auriel.cobalt.browser.DownloadActions
@@ -100,6 +102,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // While an incognito tab is on screen, the window is secure: no
+            // system screenshot, no screen recording, and a blank card in
+            // Recents instead of the page. What Chrome does by default.
+            val incognitoOnScreen = state.activeTab.incognito
+            LaunchedEffect(incognitoOnScreen) {
+                if (incognitoOnScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
+
             // Only claims Back when there is somewhere to go inside the
             // browser; otherwise it falls through and leaves the app.
             BackHandler(enabled = state.canHandleBack) { current.onBack() }
@@ -142,6 +153,15 @@ class MainActivity : ComponentActivity() {
                 bookmarkActions = BookmarkActions(
                     onOpen = current::onOpenBookmark,
                     onRemove = { current.onRemoveBookmark(it) },
+                ),
+                historyActions = HistoryActions(
+                    // Into the tab on screen, like a bookmark: a saved address
+                    // goes straight to the engine, not through search.
+                    onOpen = current::onOpenBookmark,
+                    onSearch = { current.onSearchHistory(it) },
+                    onLoadMore = { current.onLoadMoreHistory() },
+                    onRemove = { current.onRemoveHistory(it) },
+                    onClearAll = { done -> current.onClearHistory(done) },
                 ),
                 onToggleBookmark = current::onToggleBookmark,
                 onClearSiteData = current::onClearSiteData,

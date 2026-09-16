@@ -40,6 +40,7 @@ import org.chromium.chrome.browser.tab.WebContentsStateBridge
 import org.chromium.components.embedder_support.util.UrlUtilities
 import org.chromium.chrome.browser.cobalt.CobaltWebContentsDelegate
 import org.chromium.chrome.browser.content.WebContentsFactory
+import org.chromium.chrome.browser.profiles.Profile
 import org.chromium.chrome.browser.profiles.ProfileManager
 import org.chromium.ui.base.ActivityWindowAndroid
 import org.chromium.ui.base.IntentRequestTracker
@@ -163,22 +164,24 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
         return container
     }
 
+    /**
+     * A tab. An incognito one runs in Chromium's primary off-the-record
+     * Profile: its cookies, cache, storage and history live in memory only,
+     * and are dropped when the last incognito tab closes ([forget]).
+     */
     override fun createSession(incognito: Boolean): EngineSession {
         check(!destroyed) { "engine is destroyed" }
-        // Incognito is not wired up yet: it needs an off-the-record Profile and
-        // a second WebContents family, which decision 0002 gives its own
-        // surface. Failing loudly is better than silently handing back a
-        // session that records history.
-        require(!incognito) { "incognito needs an off-the-record profile (0002)" }
+        val regular = ProfileManager.getLastUsedRegularProfile()
+        val profile = if (incognito) regular.getPrimaryOtrProfile(/* createIfNeeded= */ true)!! else regular
 
         // Hidden until show(): a tab opened in the background should not
         // compete with the one on screen for the renderer's priority.
         val webContents = WebContentsFactory.createWebContents(
-            ProfileManager.getLastUsedRegularProfile(),
+            profile,
             /* initiallyHidden= */ true,
             /* initializeRenderer= */ true,
         )
-        return wrap(webContents)
+        return wrap(webContents, incognito)
     }
 
     /**
@@ -203,14 +206,20 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
         val webContents = WebContentsStateBridge.restoreContentsFromByteBuffer(
             state, /* isHidden= */ true, /* noRenderer= */ true,
         ) ?: return null
-        return wrap(webContents)
+        return wrap(webContents, incognito = false)
     }
 
-    private fun wrap(webContents: WebContents) = ChromiumSession(
-        webContents, renderView, window,
-        onClosed = ::forget,
-        onNewTab = { url -> newTabHandler?.invoke(url) },
-    )
+    /** Open incognito sessions; the off-the-record Profile goes when this reaches zero. */
+    private var incognitoSessions = 0
+
+    private fun wrap(webContents: WebContents, incognito: Boolean): ChromiumSession {
+        if (incognito) incognitoSessions++
+        return ChromiumSession(
+            webContents, renderView, window, incognito,
+            onClosed = ::forget,
+            onNewTab = { url -> newTabHandler?.invoke(url, incognito) },
+        )
+    }
 
     override fun show(session: EngineSession) {
         check(!destroyed) { "engine is destroyed" }
@@ -223,11 +232,27 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
 
     private fun forget(session: ChromiumSession) {
         if (session === shown) shown = null
+        if (session.incognito && --incognitoSessions == 0) endIncognito()
     }
 
-    private var newTabHandler: ((String) -> Unit)? = null
+    /**
+     * Drops the off-the-record Profile, and everything incognito kept with it:
+     * cookies, cache, storage, the in-memory history. What Chrome's
+     * `IncognitoProfileDestroyer` does when its last incognito tab closes.
+     *
+     * "When appropriate" because the WebContents just closed may still be
+     * tearing down in native; Chromium destroys the Profile once nothing
+     * holds it.
+     */
+    private fun endIncognito() {
+        val regular = ProfileManager.getLastUsedRegularProfile()
+        if (!regular.hasPrimaryOtrProfile()) return
+        regular.getPrimaryOtrProfile(/* createIfNeeded= */ false)?.let(ProfileManager::destroyWhenAppropriate)
+    }
 
-    override fun setNewTabHandler(handler: (url: String) -> Unit) {
+    private var newTabHandler: ((String, Boolean) -> Unit)? = null
+
+    override fun setNewTabHandler(handler: (url: String, incognito: Boolean) -> Unit) {
         newTabHandler = handler
     }
 
@@ -248,6 +273,7 @@ private class ChromiumSession(
     private val webContents: WebContents,
     private val renderView: ContentViewRenderView,
     window: ActivityWindowAndroid,
+    val incognito: Boolean,
     private val onClosed: (ChromiumSession) -> Unit,
     private val onNewTab: (String) -> Unit,
 ) : EngineSession {
@@ -471,9 +497,10 @@ private class ChromiumSession(
             host,
             UrlUtilities.getDomainAndRegistry(url.spec, false)?.takeIf { it.isNotEmpty() },
         ).distinct()
-        BrowsingDataBridge.buildBrowsingDataModelFromDisk(
-            ProfileManager.getLastUsedRegularProfile(),
-        ) { model ->
+        // The tab's own Profile: an incognito tab's data is the off-the-record
+        // Profile's, not the regular one's.
+        val profile = Profile.fromWebContents(webContents) ?: return false
+        BrowsingDataBridge.buildBrowsingDataModelFromDisk(profile) { model ->
             var left = owners.size
             for (owner in owners) {
                 model.removeBrowsingData(owner) {

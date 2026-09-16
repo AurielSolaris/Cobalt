@@ -73,8 +73,11 @@ interface BrowserEngine {
      * Where a page's request for a new tab goes: a link with `target=_blank`,
      * a middle click, `window.open` without an opener. The shell opens a tab
      * in its own model; an engine that cannot ask simply never calls this.
+     *
+     * [incognito] is the asking tab's: a link opened from an incognito tab
+     * must not land in a tab that records history.
      */
-    fun setNewTabHandler(handler: (url: String) -> Unit) {}
+    fun setNewTabHandler(handler: (url: String, incognito: Boolean) -> Unit) {}
 
     /**
      * Releases everything the engine holds.

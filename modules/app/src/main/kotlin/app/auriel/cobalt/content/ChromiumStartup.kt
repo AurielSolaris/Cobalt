@@ -8,6 +8,7 @@ import android.app.Application
 import org.chromium.base.ApplicationStatus
 import org.chromium.base.ContextUtils
 import org.chromium.base.PathUtils
+import org.chromium.base.CommandLine
 import org.chromium.base.library_loader.LibraryLoader
 import org.chromium.base.library_loader.LibraryProcessType
 import org.chromium.content_public.browser.BrowserStartupController
@@ -187,6 +188,17 @@ object ChromiumStartup {
             ResourceBundle.setAvailablePakLocales(pakLocales(app))
         } catch (t: Throwable) {
             _state.value = State.Failed("ResourceBundle.setAvailablePakLocales", t)
+            return
+        }
+
+        try {
+            // Chromium's own switches, before the library loads and copies the
+            // Java command line into native. Chrome builds this in
+            // CommandLineInitUtil; Cobalt only ever adds to it.
+            if (!CommandLine.isInitialized()) CommandLine.init(null)
+            CobaltSwitches.forEach(CommandLine.getInstance()::appendSwitch)
+        } catch (t: Throwable) {
+            _state.value = State.Failed("CommandLine", t)
             return
         }
 

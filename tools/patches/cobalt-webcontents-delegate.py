@@ -100,6 +100,7 @@ CC = """\
 #include "base/android/jni_android.h"
 #include "base/check.h"
 #include "base/no_destructor.h"
+#include "chrome/browser/history/history_tab_helper.h"
 #include "components/embedder_support/android/delegate/web_contents_delegate_android.h"
 #include "content/public/browser/web_contents.h"
 
@@ -137,6 +138,14 @@ static void JNI_CobaltWebContentsDelegate_Attach(
   auto delegate = std::make_unique<Delegate>(env, jdelegate);
   web_contents->SetDelegate(delegate.get());
   delegates[web_contents] = std::move(delegate);
+
+  // History is recorded by HistoryTabHelper, which Chrome attaches with the
+  // rest of TabHelpers::AttachTabHelpers when it creates a TabAndroid. Cobalt
+  // has no TabAndroid, so without this no visit was ever recorded. Only this
+  // helper, not all of AttachTabHelpers: it needs nothing else to be there
+  // (no TabModel, SessionTabHelper or translate client, all null-checked),
+  // and records nothing for an off-the-record Profile.
+  HistoryTabHelper::CreateForWebContents(web_contents);
 }
 
 static void JNI_CobaltWebContentsDelegate_Detach(
@@ -181,6 +190,7 @@ source_set("android") {{
   deps = [
     ":jni_headers",
     "//base",
+    "//chrome/browser",
     "//components/embedder_support/android:web_contents_delegate",
     "//content/public/browser",
   ]
