@@ -212,3 +212,44 @@ backport .                 CVE-2026-84354
 backport .                 CVE-2026-84351
 backport .                 CVE-2026-84357
 backport .                 CVE-2026-85042
+#
+# 0.4.3 -- from the second watcher batch (#26-#35). CVE-2026-85053 (#26) is
+# written (patches/security/CVE-2026-85053.diff) but not in the series yet: it
+# adds a value to network_isolation_partition.mojom, which most of Chromium
+# includes, turning an incremental build of ~1,500 steps into ~26,500. It
+# lands with the next change that needs a full rebuild anyway.
+backport .                 CVE-2026-87440
+backport third_party/libyuv CVE-2026-87444
+backport .                 CVE-2026-87492
+#
+# 0.4.3, second pass -- 25 more from the watcher's #36-#150. Chosen for being
+# reachable on Android and cheap to build: no .mojom changes, no Blink runtime
+# flags, no new features. CVE-2026-87650 (#65) is fixed in ANGLE and in the
+# validating GPU decoder; only the ANGLE half is taken, because Cobalt never
+# runs the validating decoder. docs/security-backports.md has the rest of the
+# triage.
+backport v8                CVE-2026-87564
+backport v8                CVE-2026-87612
+backport v8                CVE-2026-87587
+backport third_party/angle CVE-2026-87650-angle
+backport .                 CVE-2026-87647
+backport .                 CVE-2026-87452
+backport .                 CVE-2026-87639
+backport .                 CVE-2026-87499
+backport .                 CVE-2026-87476
+backport .                 CVE-2026-87508
+backport .                 CVE-2026-87557
+backport .                 CVE-2026-87516
+backport .                 CVE-2026-87451
+backport .                 CVE-2026-87479
+backport .                 CVE-2026-87495
+backport .                 CVE-2026-87505
+backport .                 CVE-2026-87493
+backport .                 CVE-2026-87453
+backport .                 CVE-2026-87503
+backport .                 CVE-2026-87549
+backport .                 CVE-2026-87533
+backport .                 CVE-2026-87506
+backport .                 CVE-2026-87456
+backport .                 CVE-2026-87497
+backport .                 CVE-2026-87550

@@ -56,16 +56,18 @@ there needed two upstream gaps closed: MV2's `browserAction` schema was not buil
 for Android at all, and `webNavigation` was excluded from `desktop_android`. Both
 are now ported. See [`docs/ublock-bundling.md`](docs/ublock-bundling.md).
 
-**Seventeen security fixes are backported (0.4.1, 0.4.2).** Of the 25 CVEs the
-security watch filed against 140, seventeen were adapted from current stable
-and are applied by the build: in ANGLE (WebGL, including three fixes specific
-to PowerVR GPUs, which budget MediaTek phones use), the GPU client, V8, Dawn,
-Skia, the compositor, the network stack, Cast, crash reporting, DevTools, the
-omnibox and the File System Access API. Seven do not apply to this build. One,
-in V8, is deferred until a V8 specialist has reviewed it, because it may need
-a newer Chromium rather than a backport. Each has its
-upstream commit, its patch file and the reason for what was not taken in
-[`docs/security-backports.md`](docs/security-backports.md).
+**45 security fixes are backported (0.4.1 to 0.4.3).** They were adapted from
+current stable and are applied by the build: in ANGLE (WebGL, including three
+fixes specific to PowerVR GPUs, which budget MediaTek phones use), the GPU
+process, V8, Dawn, Skia, libyuv, the compositor, the network stack, navigation,
+downloads, workers, media and image decoding, CSS, Cast, crash reporting,
+DevTools, the omnibox and the File System Access API. The security watch has
+filed about 150 CVEs against 140. Of the rest, some do not apply to this build
+(Windows, macOS, iOS, desktop UI, or a GPU decoder Cobalt never runs); some are
+deferred with a reason, such as a `.mojom` change that would mean an almost
+full rebuild; and the remainder wait to be read. For each one,
+[`docs/security-backports.md`](docs/security-backports.md) gives the upstream
+commit, the patch file, or the reason it was not taken.
 
 In progress: porting the rest of Kiwi's patch set. Two of its patches have been
 **refused** rather than ported, one of which had disabled a security check
