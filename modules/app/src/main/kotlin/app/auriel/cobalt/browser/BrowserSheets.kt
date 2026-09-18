@@ -72,6 +72,32 @@ class MenuActions(
 private val SheetShape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
 
 /**
+ * The content blocker's own popup, in a sheet.
+ *
+ * The panel is the extension's page, drawn by Chromium, so this only gives it
+ * somewhere to be: a fixed share of the screen rather than wrap-content,
+ * because the page inside decides its own height long after the sheet has been
+ * measured, and a sheet that grows under the thumb is worse than one that is
+ * simply the right size.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActionPopupSheet(onDismiss: () -> Unit, content: @Composable (Modifier) -> Unit) {
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = state,
+        shape = SheetShape,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(Modifier.navigationBarsPadding()) {
+            content(Modifier.fillMaxWidth().fillMaxHeight(0.72f))
+        }
+    }
+}
+
+/**
  * The ⋮ sheet.
  *
  * Page actions as a row of tiles at the top, the part nearest the thumb when

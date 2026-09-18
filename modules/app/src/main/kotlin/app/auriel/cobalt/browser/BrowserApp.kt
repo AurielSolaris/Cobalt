@@ -33,7 +33,7 @@ import app.auriel.cobalt.browser.settings.SettingsScreen
 import app.auriel.cobalt.ui.theme.CobaltTheme
 
 /** Which sheet is up, if any. Interface state, so it lives here and not in the controller. */
-private enum class Sheet { Menu, Tabs }
+private enum class Sheet { Menu, Tabs, ActionPopup }
 
 /**
  * The browser shell.
@@ -76,6 +76,12 @@ fun BrowserApp(
     onToggleBookmark: () -> Unit,
     onClearSiteData: (onDone: () -> Unit) -> Boolean,
     onShare: () -> Unit,
+    /**
+     * The content blocker's popup, drawn by the engine, or null if this engine
+     * runs no extensions. Supplied the same way as [page]: the shell puts it on
+     * screen and never names an engine.
+     */
+    actionPopup: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val tab = state.activeTab
     var sheet by remember { mutableStateOf<Sheet?>(null) }
@@ -174,6 +180,12 @@ fun BrowserApp(
                             onSheetOpening()
                             sheet = Sheet.Menu
                         },
+                        onActionPopup = actionPopup?.let {
+                            {
+                                onSheetOpening()
+                                sheet = Sheet.ActionPopup
+                            }
+                        },
                     )
                 }
             }
@@ -199,6 +211,10 @@ fun BrowserApp(
                     ),
                     onDismiss = { sheet = null },
                 )
+
+                Sheet.ActionPopup -> actionPopup?.let { popup ->
+                    ActionPopupSheet(onDismiss = { sheet = null }) { modifier -> popup(modifier) }
+                }
 
                 Sheet.Tabs -> TabsSheet(
                     state = state,

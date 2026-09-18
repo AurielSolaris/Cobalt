@@ -164,6 +164,69 @@ class ChromiumEngine(activity: Activity) : BrowserEngine {
         return container
     }
 
+    /** The extension popup on screen, if one is. At most one ever is. */
+    private var popup: ActionPopup? = null
+
+    /**
+     * An extension's popup page, on its own surface.
+     *
+     * A second `ContentViewRenderView` is a second hardware layer, which is
+     * exactly what the one-surface-per-engine rule above avoids -- but that
+     * rule is about thirty tabs, not about one panel that exists while a sheet
+     * is open. Sharing the page's surface is not an option: it shows one
+     * WebContents at a time, so the page would go blank behind the sheet.
+     */
+    fun createPopupContainer(context: Context, url: String): FrameLayout {
+        closePopup()
+        return ActionPopup(context, url).also { popup = it }.view
+    }
+
+    /** Drops the popup's WebContents and its surface. */
+    fun closePopup() {
+        popup?.destroy()
+        popup = null
+    }
+
+    private inner class ActionPopup(context: Context, url: String) {
+        val view: ContentViewRenderView =
+            ContentViewRenderView(context).apply { onNativeLibraryLoaded(window) }
+
+        private val webContents: WebContents = WebContentsFactory.createWebContents(
+            ProfileManager.getLastUsedRegularProfile(),
+            /* initiallyHidden= */ false,
+            /* initializeRenderer= */ true,
+        )
+
+        private val contentView: ContentView =
+            ContentView.createContentView(context, webContents)
+
+        init {
+            webContents.setDelegates(
+                /* productVersion= */ "",
+                ViewAndroidDelegate.createBasicDelegate(contentView),
+                contentView,
+                window,
+                WebContents.createDefaultInternalsHolder(),
+            )
+            view.addView(
+                contentView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+            view.setCurrentWebContents(webContents)
+            webContents.updateWebContentsVisibility(Visibility.VISIBLE)
+            webContents.navigationController.loadUrl(LoadUrlParams(url))
+        }
+
+        fun destroy() {
+            view.removeView(contentView)
+            webContents.destroy()
+            view.destroy()
+        }
+    }
+
     /**
      * A tab. An incognito one runs in Chromium's primary off-the-record
      * Profile: its cookies, cache, storage and history live in memory only,

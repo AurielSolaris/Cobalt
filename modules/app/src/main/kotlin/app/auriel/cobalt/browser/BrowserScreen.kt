@@ -95,6 +95,8 @@ fun AddressBar(
     onStop: () -> Unit,
     onTabs: () -> Unit,
     onMenu: () -> Unit,
+    /** Null when no engine here runs the content blocker: no button is shown. */
+    onActionPopup: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -199,6 +201,20 @@ fun AddressBar(
                         modifier = Modifier.size(20.dp),
                     )
                 }
+            }
+        }
+
+        // The blocker's own mark, not a shield glyph of ours: it is the icon
+        // people already know from every other browser, and it is uBlock's
+        // panel that opens, not a Cobalt setting. Untinted for the same reason.
+        if (onActionPopup != null) {
+            IconButton(onClick = onActionPopup, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(app.auriel.cobalt.R.drawable.ic_ublock),
+                    contentDescription = "uBlock Origin",
+                    tint = androidx.compose.ui.graphics.Color.Unspecified,
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
 

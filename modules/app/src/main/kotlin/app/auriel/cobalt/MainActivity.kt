@@ -131,6 +131,9 @@ class MainActivity : ComponentActivity() {
                 onCloseTab = current::onCloseTab,
                 onCloseAllTabs = current::onCloseAllTabs,
                 onSheetOpening = current::captureThumbnail,
+                actionPopup = shell.actionPopupUrl?.let { url ->
+                    { modifier -> shell.ActionPopup(url, modifier) }
+                },
                 certificate = { current.session(state.activeTabId).certificate() },
                 about = AboutInfo(engineName = shell.engineName, creditsUrl = shell.creditsUrl),
                 onOpenInNewTab = current::openInNewTab,

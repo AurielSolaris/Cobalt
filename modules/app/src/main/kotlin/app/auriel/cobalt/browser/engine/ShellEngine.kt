@@ -69,6 +69,22 @@ interface ShellEngine {
      */
     suspend fun capturePage(session: EngineSession): Bitmap? = null
 
+    /**
+     * The bundled content blocker's action popup -- what a desktop browser
+     * shows when its toolbar button is clicked -- or null if this engine runs
+     * no extensions. It is an ordinary extension page, so only an engine with
+     * an extension system has one.
+     */
+    val actionPopupUrl: String? get() = null
+
+    /**
+     * That popup, drawn. It gets a surface of its own rather than the one the
+     * page uses: the page's surface holds one WebContents at a time, so a popup
+     * borrowing it would blank the page behind the sheet it rises from.
+     */
+    @Composable
+    fun ActionPopup(url: String, modifier: Modifier): Unit = Unit
+
     /** The engine's downloads, once it is ready; null if this engine has none. */
     val downloads: DownloadsSource? get() = null
 

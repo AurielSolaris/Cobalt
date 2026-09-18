@@ -104,6 +104,23 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
         )
     }
 
+    /**
+     * uBlock Origin's own popup, the one its toolbar button opens everywhere
+     * else. `popup-fenix.html` is the phone-shaped one uBO ships for Firefox
+     * for Android; the desktop `popup.html` assumes a window that is wider than
+     * this screen.
+     */
+    override val actionPopupUrl = "chrome-extension://$UBLOCK_ID/popup-fenix.html"
+
+    @Composable
+    override fun ActionPopup(url: String, modifier: Modifier) {
+        AndroidView(
+            modifier = modifier.fillMaxSize(),
+            factory = { context -> (engine as ChromiumEngine).createPopupContainer(context, url) },
+            onRelease = { (engine as ChromiumEngine).closePopup() },
+        )
+    }
+
     override suspend fun capturePage(session: EngineSession): Bitmap? =
         (engine as ChromiumEngine).capture(session, activity.cacheDir)
 
@@ -120,5 +137,12 @@ class ChromiumShellEngine(private val activity: ComponentActivity) : ShellEngine
 
     private companion object {
         val INTERNAL = listOf("chrome://", "about:")
+
+        /**
+         * uBlock Origin's extension id, which follows from the key it is signed
+         * with. The same constant is in tools/patches/cobalt-bundle-ublock.py,
+         * and both change together if that key ever does.
+         */
+        const val UBLOCK_ID = "fimbmjialkbnbbedhcpdodbhicmjfgli"
     }
 }
