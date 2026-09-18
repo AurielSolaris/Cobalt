@@ -96,6 +96,32 @@ is_desktop_android = true
 # --- Identity ------------------------------------------------------------
 chrome_public_manifest_package = "app.auriel.cobalt"
 
+# --- Codecs ---------------------------------------------------------------
+#
+# H.264 and AAC, carried in the APK rather than borrowed from the phone.
+#
+# Chromium's default build has neither: with ffmpeg_branding = "Chromium" the
+# android/arm64 config sets CONFIG_H264_DECODER 0 and CONFIG_AAC_DECODER 0, so
+# the browser can only play them by handing the stream to Android's MediaCodec,
+# and a device whose vendor left a format out simply cannot play it. The Chrome
+# branding turns both decoders on (and MP3), which is what Chrome ships.
+#
+# proprietary_codecs is what gates the demuxers and the "can I play this" answer
+# Blink gives; ffmpeg_branding is what decides which decoders are compiled in.
+# Both are needed: one without the other either claims support it cannot honour
+# or carries decoders nothing will reach.
+#
+# This is decode only. AAC encoding is off in that same config
+# (CONFIG_AAC_ENCODER 0), and upstream forces media_use_openh264 false on
+# Android (media/media_options.gni), so H.264 *encoding* still goes to
+# MediaCodec. Bundling an encoder means patching that gni, which is a separate
+# decision -- see docs/codecs.md.
+#
+# Licensing: H.264 and AAC are patent-encumbered. Chrome ships them under
+# Google's own licences, which do not extend to a fork. See docs/codecs.md.
+proprietary_codecs = true
+ffmpeg_branding = "Chrome"
+
 # --- Features Cobalt does not ship ---------------------------------------
 #
 # A phone that struggles with WebGL is not running WebXR workloads, and each of
