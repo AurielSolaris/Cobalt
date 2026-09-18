@@ -135,7 +135,39 @@ object Presets {
         danger = Color(0xFFDC322F),
     )
 
-    val all = listOf(Cobalt, OneDark, SolarizedLight, SolarizedDark)
+    /**
+     * Dreamy Purple, after the Chrome theme of that name
+     * (nbfadodpeabiajchiglbobhhgjihjnio), which a Cobalt user asked for.
+     *
+     * Its own colours where they map: the toolbar (#3A1A83) is the darkest
+     * surface, the new-tab ground (#674EA7) is the ground here, and its text is
+     * white. Its frame (#6868C2) becomes the border and, lightened, the
+     * gradient's far stop.
+     *
+     * Two things are not replicated. The Chrome theme is mostly four background
+     * *images*; a Cobalt theme is colour tokens (0007), so this is the palette
+     * without the artwork. And its red would have been unreadable: the natural
+     * partner to these purples reached 2.37:1 against the ground, under the
+     * 3:1 a status colour needs, so danger is lightened until it passes.
+     */
+    val DreamyPurple = Palette(
+        id = "dreamy-purple",
+        name = "Dreamy Purple",
+        isDark = true,
+        bgPrimary = Color(0xFF674EA7),   // ntp_background
+        bgSecondary = Color(0xFF3A1A83), // toolbar
+        surface = Color(0xFF4A2A9B),
+        border = Color(0xFF7A63B8),
+        fg = Color(0xFFFFFFFF),          // tab_text, ntp_text, bookmark_text
+        fgMuted = Color(0xFFD8D0F0),
+        accent = Color(0xFFC0AFFF),      // the buttons tint's hue, at a legible lightness
+        accentEnd = Color(0xFFA8C0FF),   // frame (#6868C2), lightened
+        success = Color(0xFF6FE39B),
+        warning = Color(0xFFFFD35C),
+        danger = Color(0xFFFFA0AC),
+    )
+
+    val all = listOf(Cobalt, OneDark, SolarizedLight, SolarizedDark, DreamyPurple)
 
     val defaultDark = Cobalt
     val defaultLight = SolarizedLight

@@ -8,10 +8,15 @@
 
 What exists, in `modules/app/.../ui/theme/` and `browser/settings/`:
 
-- **Four presets:** **Cobalt** (the default dark theme, and this decision's
+- **Five presets:** **Cobalt** (the default dark theme, and this decision's
   "Carbon, iced, with a One Dark cast", a modified One Dark that carries the
   project's name), **One Dark** (Atom's, unchanged, what 0.1.0 shipped),
-  **Solarized Light** and **Solarized Dark**.
+  **Solarized Light**, **Solarized Dark**, and **Dreamy Purple** (0.4.4),
+  taken from the Chrome theme of that name at a user's request: its own
+  toolbar, ground and text colours, without its four background images, which
+  a token palette has nowhere to put. Its natural red reached only 2.37:1 on
+  that ground, so `danger` is lightened until it passes 3:1 — a preset that
+  fails the contrast bar this decision sets would be a strange thing to ship.
 - **A light theme and a dark theme, paired.** The user picks one for each, and
   the app follows the phone's light/dark setting, or is pinned to either. The
   defaults are Solarized Light and Cobalt. The maintainer chose pairing over a

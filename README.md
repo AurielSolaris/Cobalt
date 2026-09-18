@@ -260,8 +260,8 @@ What works, on device:
 - The lock icon explains itself: tap it for the connection's state and the
   site's certificate (issuer, validity, SHA-256), and to clear the site's
   cookies and stored data
-- Themes: Cobalt, One Dark, Solarized Light and Solarized Dark, with one theme
-  for day and one for night following the phone. You can make your own on the
+- Themes: Cobalt, One Dark, Solarized Light, Solarized Dark and Dreamy Purple,
+  with one theme for day and one for night following the phone. You can make your own on the
   phone by choosing colours, and share them as text
   ([decision 0007](docs/decisions/0007-user-themes.md))
 - Settings → About: version, engine, source and licences
