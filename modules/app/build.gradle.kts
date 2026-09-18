@@ -162,6 +162,30 @@ android {
             resValue("string", "app_name", "Cobalt")
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
+
+        // The nightly channel, built the way the release is.
+        //
+        // `debug` also carries the nightly identity, because that is what a
+        // day's work installs; this is the same channel built without debug
+        // information and without the debuggable flag, which is what a tester
+        // should actually run. Same application id, so it replaces the debug
+        // nightly on the phone rather than sitting beside it: two builds
+        // claiming to be "the nightly" is how a bug report becomes ambiguous.
+        //
+        // R8 stays off, as in release. Chromium's AAR reaches its own Java from
+        // native by name (jni_zero registers by name here -- see
+        // enable_jni_multiplexing in tools/build/build-chromium.sh), and
+        // shrinking that without the rules describing it is how a browser
+        // starts and immediately aborts.
+        create("nightly") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".nightly"
+            versionNameSuffix = "-nightly"
+            resValue("string", "app_name", "Cobalt Nightly")
+            isMinifyEnabled = false
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
+        }
     }
 
     compileOptions {
