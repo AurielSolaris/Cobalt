@@ -213,11 +213,10 @@ backport .                 CVE-2026-84351
 backport .                 CVE-2026-84357
 backport .                 CVE-2026-85042
 #
-# 0.4.3 -- from the second watcher batch (#26-#35). CVE-2026-85053 (#26) is
-# written (patches/security/CVE-2026-85053.diff) but not in the series yet: it
-# adds a value to network_isolation_partition.mojom, which most of Chromium
-# includes, turning an incremental build of ~1,500 steps into ~26,500. It
-# lands with the next change that needs a full rebuild anyway.
+# 0.4.3 -- from the second watcher batch (#26-#35). CVE-2026-85053 (#26) was
+# written here and held back: it adds a value to a mojom most of Chromium
+# includes, which turns an incremental build of ~1,500 steps into ~26,500. It
+# lands in 0.4.4 below, where the codec change rebuilds everything anyway.
 backport .                 CVE-2026-87440
 backport third_party/libyuv CVE-2026-87444
 backport .                 CVE-2026-87492
@@ -253,3 +252,17 @@ backport .                 CVE-2026-87506
 backport .                 CVE-2026-87456
 backport .                 CVE-2026-87497
 backport .                 CVE-2026-87550
+#
+# 0.4.4. This release turns on H.264 and AAC, which rebuilds Chromium from
+# scratch, so the two backports that change a .mojom -- held back through 0.4.3
+# because each would have cost ~26,500 build steps on its own -- go in here at
+# no extra cost.
+backport .                 CVE-2026-85053
+backport .                 CVE-2026-87553
+backport .                 CVE-2026-87471
+backport .                 CVE-2026-87547
+backport .                 CVE-2026-87441
+backport .                 CVE-2026-87504
+backport .                 CVE-2026-87445
+backport .                 CVE-2026-87510
+backport .                 CVE-2026-87442
